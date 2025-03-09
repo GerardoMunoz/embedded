@@ -12,8 +12,8 @@ Students must submit the following at least **one week before** the presentation
   *  Power consumption
   *  Security
   *  Relationship with other protocols
-  *  Applications (Python or C) (PC or microcontroller)
   *  License
+  *  Applications (Python or C) (PC or microcontroller)
 
 3. **Description of Practical Activity:** An explanation of an interactive activity related to the topic.
 4. **List of Required Materials:** A detailed list of components/tools needed for the practical application.
