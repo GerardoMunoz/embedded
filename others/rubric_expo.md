@@ -1,4 +1,8 @@
-# Embedded Systems Exposition Rubric
+# Embedded Systems Exposition 
+
+## **Duration**
+* 30 min. Presentation
+* 30 min. Practice 
 
 ## **Submission Requirements (Before Presentation)**
 Students must submit the following at least **one week before** the presentation:
