@@ -3,9 +3,17 @@
 ## **Submission Requirements (Before Presentation)**
 Students must submit the following at least **one week before** the presentation:
 1. **Presentation File (PDF):** A well-structured slide deck.
-2. **Description of Practical Activity:** An explanation of an interactive activity related to the topic.
-3. **List of Required Materials:** A detailed list of components/tools needed for the practical application.
-4. **Backup Plan (Plan B):** An alternative approach if materials are unavailable.
+  *  Description
+  *  OSI Layer
+  *  Power consumption
+  *  Security
+  *  Relationship with other protocols
+  *  Applications
+  *  License
+
+3. **Description of Practical Activity:** An explanation of an interactive activity related to the topic.
+4. **List of Required Materials:** A detailed list of components/tools needed for the practical application.
+5. **Backup Plan (Plan B):** An alternative approach if materials are unavailable.
 
 ## **Presentation Evaluation Criteria**
 
