@@ -3,7 +3,7 @@
 |-------|------------------------------------------------------|------------------------------------------|
 | 1     | Applications                                        |                                          |
 | 1     | Raspberry Pi Pico W hardware board                           |                                          |
-| 2     | GPIO                                     |                                          |
+| 2     | GPIO: Pin vs Pad                                     |                                          |
 | 3     |                                                    | RPi Pico Tool chain in C                |
 | 3     |                                                    | Blink LED                               |
 | 4     | 😊 Data types, pointers, memory management, Best Practices: Code modularity, efficient memory usage, debugging techniques, and object-oriented | |
