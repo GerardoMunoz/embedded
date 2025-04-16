@@ -11,7 +11,7 @@
 | 5     | 😊 RP2040 Memory map                                   |                                          |
 | 5     | 😊 RP2040 SIO - Multicore FIFO                       |                                          |
 | 6     |                                                    | IR decoder and generator, sleep modes        |
-| 7     | 😊 😊 RP2040 PIO                                         |                                          |
+| 7     | RP2040 PIO                                         |                                          |
 | 8     | 😊 RFID                                              |                                          |
 | 8     | 😊 NFC                                               |                                          |
 | 9     |                                                    | PWM Signal generator, timers            |
@@ -27,3 +27,4 @@
 | 16    | 😊 Bluetooth                                         |                                          |
 | 17    | 😊 😊 CYW43439                                          |                                          |
 | 18    |                                                    | Web Server                              |
+| 19   | 😊 😊 Cloud                                          |                                          |
