@@ -3,3 +3,4 @@ Do not forget to copy in the same directory of your .c file pico_sdk_import.cmak
 
 * https://github.com/GerardoMunoz/Curso_Python/blob/main/Comparaci%C3%B3n_while_IRQ_PIO.ipynb
 * https://github.com/GerardoMunoz/Curso_Python/blob/main/IR_control.ipynb
+* https://github.com/GerardoMunoz/Curso_Python/blob/main/ADC_upy_DMA.ipynb
