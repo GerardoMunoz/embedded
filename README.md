@@ -8,3 +8,4 @@ Do not forget to copy in the same directory of your .c file pico_sdk_import.cmak
 * https://github.com/GerardoMunoz/embedded/blob/main/practice/RC_ADC_sampling.md
 * https://github.com/GerardoMunoz/embedded/blob/main/practice/accelerating.md
 * https://colab.research.google.com/github/GerardoMunoz/embedded/blob/main/WiFi_Sockets.ipynb
+* https://colab.research.google.com/github/GerardoMunoz/embedded/blob/main/HTTP_HTML.ipynb
