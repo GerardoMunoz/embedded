@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+	<head lang="en">
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+		<script src="https://cdn.jsdelivr.net/npm/three@0.126.1/build/three.min.js"></script>
+	</head>
+	<body>
+        <div id="arm"></div>
+        <h1>ARM</h1>
+		<div id="error"></div>
+        <p>Control the onboard LED</p>
+        <button onclick="led_on()">LED ON</button>
+        <button onclick="led_off()">LED OFF</button>
+        <button onclick="quit()">QUIT</button>
+		<script  >
+		
+class Robot {
+  constructor(scene, options = {}) {
+    this.state = {
+      x: options.x ?? 0,
+      y: options.y ?? 0,
+      beta: options.beta ?? 0,
+      alpha0: options.alpha0 ?? 0,
+      alpha1: options.alpha1 ?? 0,
+      alpha2: options.alpha2 ?? 0,
+    };
+
+    this.group = new THREE.Group();
+    scene.add(this.group);
+
+    this._build();
+
+    // Para animaciones
+    this.sequence = [];
+    this.currentStep = null;
+    this.timeLeft = 0;
+    this.initialAngles = {};
+  }
+
+  _build() {
+    // Base
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 0.5, 2),
+      new THREE.MeshBasicMaterial({ color: 0x0077ff })
+    );
+    this.group.add(base);
+
+    // Ruedas
+    const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 32);
+    const wheelMaterial = new THREE.MeshBasicMaterial({ color: 0x222222 });
+
+    const wheelOffsets = [
+      [1.2, -0.2, 0.7],
+      [1.2, -0.2, -0.7],
+      [-1.2, -0.2, 0.7],
+      [-1.2, -0.2, -0.7],
+    ];
+
+    wheelOffsets.forEach(([x, y, z]) => {
+      const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(x, y, z);
+      this.group.add(wheel);
+    });
+
+    // Brazo
+    this.armBase = new THREE.Group();
+    this.armBase.position.y = 0.5;
+    base.add(this.armBase);
+
+    this.joint0 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.2, 0.2, 16),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+    this.joint0.rotation.x = Math.PI / 2;
+    this.armBase.add(this.joint0);
+
+    const arm0 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 2, 0.3),
+      new THREE.MeshBasicMaterial({ color:  0x00ff77 })
+    );
+    arm0.position.y = 1;
+    this.joint0.add(arm0);
+
+    this.joint1 = new THREE.Group();
+    this.joint1.position.y = 1;
+    arm0.add(this.joint1);
+
+    const arm1 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 1.5, 0.3),
+      new THREE.MeshBasicMaterial({ color:  0x00ff77 })
+    );
+    arm1.position.y = 0.75;
+    this.joint1.add(arm1);
+
+    this.joint2 = new THREE.Group();
+    this.joint2.position.y = 0.75;
+    arm1.add(this.joint2);
+
+    const arm2 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 1, 0.3),
+      new THREE.MeshBasicMaterial({ color:  0x00ff77 })
+    );
+    arm2.position.y = 0.5;
+    this.joint2.add(arm2);
+  }
+
+  // Movimiento relativo (manual)
+  moveTo(delta = {}) {
+    Object.entries(delta).forEach(([key, value]) => {
+      if (this.state.hasOwnProperty(key)) {
+        this.state[key] += value;
+      }
+    });
+  }
+
+  // Definir una secuencia de movimientos
+  setSequence(sequence) {
+    this.sequence = sequence;
+    this.currentStep = null;
+    this.timeLeft = 0;
+  }
+
+  _startNextStep() {
+    if (this.sequence.length === 0) {
+      this.currentStep = null;
+      return;
+    }
+    this.currentStep = this.sequence.shift();
+    this.timeLeft = this.currentStep.time;
+
+    // Guardar ángulos iniciales para interpolar
+    this.initialAngles = {
+      alpha0: this.state.alpha0,
+      alpha1: this.state.alpha1,
+      alpha2: this.state.alpha2,
+    };
+  }
+
+  update(deltaTime) {
+    // Si no hay step activo, iniciar el siguiente
+    if (!this.currentStep) {
+      this._startNextStep();
+      if (!this.currentStep) {
+        // Nada más que hacer
+        this._render();
+        return;
+      }
+    }
+
+    // Aplicar velocidades lineales
+    this.state.x += (this.currentStep.vx ?? 0) * deltaTime;
+    this.state.y += (this.currentStep.vy ?? 0) * deltaTime;
+
+    // Aplicar velocidad angular
+    this.state.beta += (this.currentStep.w ?? 0) * deltaTime;
+
+    // Interpolación de ángulos
+    const t = 1 - this.timeLeft / this.currentStep.time; // progreso [0..1]
+
+    ["alpha0", "alpha1", "alpha2"].forEach(key => {
+      if (this.currentStep[key] !== undefined) {
+        const start = this.initialAngles[key];
+        const end = this.currentStep[key];
+        this.state[key] = start + (end - start) * t;
+      }
+    });
+
+    // Actualizar tiempo restante
+    this.timeLeft -= deltaTime;
+    if (this.timeLeft <= 0) {
+      this._startNextStep();
+    }
+
+    this._render();
+  }
+
+  _render() {
+    // Posición y orientación
+    this.group.position.set(this.state.x, 0, this.state.y);
+    this.group.rotation.y = this.state.beta;
+
+    // Servos
+    this.joint0.rotation.z = this.state.alpha0;
+    this.joint1.rotation.z = this.state.alpha1;
+    this.joint2.rotation.z = this.state.alpha2;
+  }
+}
+
+		
+			
+			document.write((new Date()).toLocaleTimeString(),'b');
+
+		// Set up Three.js scene and camera
+		const width = window.innerWidth;
+		const height = window.innerHeight / 2;
+		const scene = new THREE.Scene();
+		const camera = new THREE.PerspectiveCamera(15, width / height, 0.1, 1000);
+		camera.position.x = 0;
+		camera.position.y = 25;
+		camera.position.z = 25;
+		camera.lookAt(0, 0, 0);
+
+			// Create WebGL renderer and append it to the DOM
+		const renderer = new THREE.WebGLRenderer();
+		renderer.setSize(width, height);
+		const arm_DOM = document.getElementById("arm");
+		arm_DOM.appendChild(renderer.domElement);
+
+
+const robot = new Robot(scene, { x: 0, y: 0 });
+
+// Coreografía de ejemplo
+robot.setSequence([
+  { vx: 1, vy: 0, w: 0, alpha0: Math.PI/6, time: 2 }, // Avanza recto + sube brazo
+  { vx: 0, vy: 0, w: Math.PI/4, alpha1: Math.PI/4, time: 2 }, // Gira + mueve segundo servo
+  { vx: -1, vy: 0, w: 0, alpha2: Math.PI/6, time: 3 }, // Retrocede + mueve tercer servo
+]);
+
+let lastTime = performance.now();
+/*function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const deltaTime = (now - lastTime) / 1000; // en segundos
+  lastTime = now;
+
+  robot.update(deltaTime);
+
+  renderer.render(scene, camera);
+}
+animate();*/
+		
+
+		// Start the animation loop
+;
+// --- Estado de las teclas ---
+const keys = {};
+window.addEventListener("keydown", (e) => { keys[e.code] = true; });
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+// --- Parámetros de movimiento ---
+const cameraSpeed = 0.01;
+const rotationSpeed = 0.002;
+
+
+		animate()
+		function animate() {
+			
+			
+			//if (t <= 1) {
+				requestAnimationFrame(animate);
+			//}
+
+
+  const now = performance.now();
+  const deltaTime = (now - lastTime) / 1000; // en segundos
+  lastTime = now;
+handleCameraControls();
+  robot.update(deltaTime);
+
+  renderer.render(scene, camera);
+
+
+		}
+		
+function handleCameraControls() {
+  // Avanzar / retroceder
+  if (keys["KeyW"]) {
+    camera.position.x -= Math.sin(camera.rotation.y) * cameraSpeed;
+    camera.position.z -= Math.cos(camera.rotation.y) * cameraSpeed;
+  }
+  if (keys["KeyS"]) {
+    camera.position.x += Math.sin(camera.rotation.y) * cameraSpeed;
+    camera.position.z += Math.cos(camera.rotation.y) * cameraSpeed;
+  }
+
+  // Desplazamiento lateral
+  if (keys["KeyA"]) {
+    camera.position.x -= Math.cos(camera.rotation.y) * cameraSpeed;
+    camera.position.z += Math.sin(camera.rotation.y) * cameraSpeed;
+  }
+  if (keys["KeyD"]) {
+    camera.position.x += Math.cos(camera.rotation.y) * cameraSpeed;
+    camera.position.z -= Math.sin(camera.rotation.y) * cameraSpeed;
+  }
+
+  // Rotación izquierda/derecha
+  if (keys["ArrowLeft"]) {
+    camera.rotation.y += rotationSpeed;
+  }
+  if (keys["ArrowRight"]) {
+    camera.rotation.y -= rotationSpeed;
+  }
+
+  // Rotación arriba/abajo
+  if (keys["ArrowUp"]) {
+    camera.rotation.x += rotationSpeed;
+  }
+  if (keys["ArrowDown"]) {
+    camera.rotation.x -= rotationSpeed;
+  }
+}
+
+		// Function to turn the LED on
+		function led_on() {
+			material.color.setRGB(1, 1, 1);
+		}
+
+		// Function to turn the LED off
+		function led_off() {
+			material.color.setRGB(0, 0, 1);
+		}
+
+		// Function to quit or reset
+		function quit() {
+			material.color.setRGB(0, 0, 0);
+		}
+
+		// Function to calculate inverse kinematics
+		function inv_kin(P) {
+			const x03 = -P.x;
+			const z03 = P.y;
+			const y03 = P.z;
+			const th1 = Math.atan2(y03, x03);
+			const r1 = Math.sqrt(x03 ** 2 + y03 ** 2);
+			const r2 = -(z03 - a1);
+			const phi2 = Math.atan2(r2, r1);
+			const r3 = Math.sqrt(r1 ** 2 + r2 ** 2);
+			const phi1 = Math.acos((a3 ** 2 - a2 ** 2 - r3 ** 2) / (-2 * a2 * r3));
+			const th2 = phi2 - phi1;
+			const phi3 = Math.acos((r3 ** 2 - a2 ** 2 - a3 ** 2) / (-2 * a2 * a3));
+			const th3 = Math.PI - phi3;
+			return [th1, th2, th3];
+		}
+
+		// Function for Bezier interpolation between two points
+		function bezier2(P0, P1, t) {
+			const R = P0.clone().multiplyScalar(1 - t).add(P1.clone().multiplyScalar(t));
+			return R;
+		}
+		function bezier4(P0, P1, P2, P3, t) {
+			const R0 = P0.clone().multiplyScalar((1 - t)**3);
+			const R1 = P1.clone().multiplyScalar((1 - t)**2).multiplyScalar(3*t);
+			const R2 = P2.clone().multiplyScalar(1 - t).multiplyScalar(3*t**2);
+			const R3 = P3.clone().multiplyScalar(t**3);
+			return R0.add(R1).add(R2).add(R3);
+		}
+		
+
+		
+		</script>
+
+	</body>
+</html>
