@@ -20,7 +20,7 @@ GET /users/123
 
 ---
 
-👉 In summary: **REST doesn’t add anything “new” to HTTP, but establishes conventions and an architectural style to use HTTP consistently.**
+In summary: **REST doesn’t add anything “new” to HTTP, but establishes conventions and an architectural style to use HTTP consistently.**
 
 * Example of a REST API:
 
@@ -304,10 +304,49 @@ ws.send("Hello server!");
 - Remote control applications.
 
 
+#### Masking
+
+* In RFC 6455, all frames sent from client → server must be masked.
+
+* The idea is to prevent certain security issues with proxy caches and intermediaries that might misinterpret WebSocket traffic as HTTP.
+
+* Frames from server → client are not masked.
+
+##### How masking works
+
+* In the WebSocket frame header, there is a 4-byte masking key.
+
+* The actual payload is XOR’d byte-by-byte with this key.
+
+* To recover the original data, the server must apply the same XOR again.
+
+#### Frame structure (RFC 6455 simplified)
+
+A WebSocket frame header looks like this:
+* Byte 1:
+  * FIN bit (is this the final fragment?)
+  * Opcode (type of frame: text, binary, ping, pong, etc.)
+* Byte 2:
+  * Mask bit (always 1 for messages from client → server)
+  * Payload length:
+    * If 0–125 → that’s the length.
+    * If 126 → next 2 bytes store the actual length (16-bit). 
+    * If 127 → next 8 bytes store the actual length (64-bit). 
+* Masking key (4 bytes) – used to XOR the payload.
+* Payload data – actual message bytes.
+
+
 
 
 
 ### Example:
+
+Limitations:
+* it can handle messages no larger than 125 bytes.
+* It ignores the opcode, so it only assumes text frames (opcode = 0x1).
+* It doesn’t handle fragmentation (when a message is split across multiple frames).
+* It doesn’t handle binary frames, pings/pongs, or close frames.
+
 
 ```javascript
 import network
@@ -439,26 +478,4 @@ while True:
 
 
 ```
-
-
-#### Frame structure (RFC 6455 simplified)
-
-A WebSocket frame header looks like this:
-* Byte 1:
-  * FIN bit (is this the final fragment?)
-  * Opcode (type of frame: text, binary, ping, pong, etc.)
-* Byte 2:
-  * Mask bit (always 1 for messages from client → server)
-  * Payload length:
-    * If 0–125 → that’s the length.
-    * If 126 → next 2 bytes store the actual length (16-bit). (**not implemented**)
-    * If 127 → next 8 bytes store the actual length (64-bit). (**not implemented**)
-* Masking key (4 bytes) – used to XOR the payload.
-* Payload data – actual message bytes.
-
-
-#### Other limitations
-* It ignores the opcode, so it only assumes text frames (opcode = 0x1).
-* It doesn’t handle fragmentation (when a message is split across multiple frames).
-* It doesn’t handle binary frames, pings/pongs, or close frames.
 
