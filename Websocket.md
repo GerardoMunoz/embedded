@@ -342,11 +342,10 @@ A WebSocket frame header looks like this:
 ### Example:
 
 Limitations:
-* it can handle messages no larger than 125 bytes.
-* It ignores the opcode, so it only assumes text frames (opcode = 0x1).
-* It doesn’t handle fragmentation (when a message is split across multiple frames).
-* It doesn’t handle binary frames, pings/pongs, or close frames.
-
+* Supports messages only up to 125 bytes.
+* Ignores the opcode, assuming all frames are text (opcode = 0x1).
+* Does not support fragmentation (messages split across multiple frames).
+* Does not support binary frames, ping/pong control frames, or close frames.
 
 ```javascript
 import network
