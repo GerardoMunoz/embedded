@@ -477,4 +477,6 @@ while True:
 
 
 ```
+### Project
 
+Create a server with a web page for remotely controlling the car and the arm, transmitting commands over WebSockets. At this stage, simply print the received information.
