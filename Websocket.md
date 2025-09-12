@@ -199,6 +199,53 @@ A **WebSocket** is a communication protocol that provides a **bidirectional, rea
 Unlike traditional HTTP, where the client always initiates communication, WebSockets allow **both sides to send messages at any time**.
 
 
+
+### History
+#### Origin
+
+2008–2009 → The idea of a full-duplex communication channel inside the browser emerged during early discussions in the HTML5 working group.
+
+Ian Hickson (working at Google and active in the WHATWG and W3C HTML5 work) is credited with drafting the first WebSocket specification.
+
+#### Standardization
+
+IETF (Internet Engineering Task Force) took responsibility for defining the protocol.
+
+The final specification is in RFC 6455, published in December 2011.
+
+Title: “The WebSocket Protocol”.
+
+It defines:
+
+The handshake (HTTP Upgrade → WebSocket).
+
+The framing format (opcodes, masking, payload length rules).
+
+Rules for text, binary, ping/pong, and close frames.
+
+#### API Definition
+
+The W3C (World Wide Web Consortium) standardized the JavaScript WebSocket API for browsers.
+
+This API maps directly to the protocol defined by IETF.
+
+Example: new WebSocket("ws://..."), onopen, onmessage, etc.
+
+#### Updates and Evolutions
+
+RFC 6455 (2011) → the main, stable definition.
+
+No replacement RFC yet — it is still the base standard.
+
+Related RFCs later added extensions or related mechanisms:
+
+RFC 7692 (2015) → permessage-deflate (compression extension).
+
+RFC 8441 (2018) → Bootstrapping WebSockets with HTTP/2.
+
+Work has also gone into allowing WebSockets over HTTP/2 and HTTP/3, but RFC 6455 itself remains unchanged.
+
+
 ###  Relationship with TCP and HTTP
 - WebSockets run **on top of TCP**, ensuring reliable and ordered transmission.
 - The connection starts as a **normal HTTP request**.
@@ -393,12 +440,56 @@ while True:
 
 ```
 
-* Advantage over REST:
 
-  * REST → stateless, one request → one response.
-  * WebSocket → persistent, supports event-driven flows.
+#### Frame structure (RFC 6455 simplified)
 
----
+A WebSocket frame header looks like this:
+
+Byte 1:
+
+FIN bit (is this the final fragment?)
+
+Opcode (type of frame: text, binary, ping, pong, etc.)
+
+Byte 2:
+
+Mask bit (always 1 for messages from client → server)
+
+Payload length:
+
+If 0–125 → that’s the length.
+
+If 126 → next 2 bytes store the actual length (16-bit).
+
+If 127 → next 8 bytes store the actual length (64-bit).
+
+Masking key (4 bytes) – used to XOR the payload.
+
+Payload data – actual message bytes.
+
+#### What the function does
+
+hdr = client.recv(2)
+length = hdr[1] & 0x7F
 
 
+It only looks at the lower 7 bits of the second byte (the “payload length” field).
+
+If the length is ≤ 125 → this works fine.
+
+But if the payload is bigger:
+
+126 → means “read the next 2 bytes to get the real length”.
+
+127 → means “read the next 8 bytes”.
+
+Your code does not handle those cases, so any message longer than 125 bytes will break.
+
+#### Other limitations
+
+It ignores the opcode, so it only assumes text frames (opcode = 0x1).
+
+It doesn’t handle fragmentation (when a message is split across multiple frames).
+
+It doesn’t handle binary frames, pings/pongs, or close frames.
 
