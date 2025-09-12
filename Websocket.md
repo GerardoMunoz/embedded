@@ -65,6 +65,13 @@ GET /users/123
 ---
 
 ## 2. WebHook
+A webhook is just:
+
+You tell the provider (via HTTP) the URL where you want to receive events.
+
+The provider sends you HTTP requests (usually POST) whenever an event happens.
+
+So the “subscription” step is usually an HTTP request you make to the provider’s API.
 
 * **Event-driven communication mechanism.**
 * Instead of the client polling the server, the server sends data **when an event occurs**.
@@ -96,6 +103,55 @@ GET /users/123
   * WebHook → direct HTTP communication between services.
   * Pub/Sub → uses a **broker** between publishers and subscribers.
 * In IoT, WebHooks are useful for **event notifications**, while MQTT is better for **continuous data streams**.
+* There isn’t a single universal standard HTTP message for subscribing to a webhook. It actually depends on the service you’re integrating with. But most providers follow some common patterns built on top of plain HTTP.
+
+
+
+
+### Typical patterns
+
+REST-style subscription
+You send a POST request to the provider’s API, telling it your webhook URL:
+
+POST /webhooks HTTP/1.1
+Host: api.example.com
+Content-Type: application/json
+
+{
+  "url": "https://myapp.com/webhook",
+  "events": ["user.created", "user.deleted"]
+}
+
+
+Then the provider might answer with 201 Created and return the webhook ID.
+
+Challenge/verification handshake
+Many providers (e.g., GitHub, Slack, Stripe) send a verification request (often a GET or POST) to your webhook URL to confirm you control it.
+Example (Stripe style):
+
+POST https://myapp.com/webhook
+{
+  "type": "verification",
+  "challenge": "abc123"
+}
+
+
+Your server must reply with that challenge token.
+
+Manual configuration
+Sometimes you don’t subscribe via HTTP at all—you go into the provider’s dashboard (UI), paste your webhook URL, and they handle the rest.
+
+### Standards
+
+There are some efforts at standardizing this:
+
+WebSub (W3C)
+ defines a publish/subscribe system over HTTP.
+
+But in practice, most webhook systems are custom, with similar but slightly different subscription flows.
+
+
+
 
 ### WebHooks in Discord
 
