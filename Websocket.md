@@ -1,4 +1,4 @@
-# REST, WebHook, WebSocket and JavaScript Methods
+# REST, WebHook, JavaScript Methods and WebSocket
 
 ## 1. REST
 
@@ -169,7 +169,30 @@ But in practice, most webhook systems are custom, with similar but slightly diff
 
 ---
 
-## 3. WebSocket
+## 3. JavaScript Methods for Communication
+
+### fetch()
+
+* Modern **JavaScript** function for making HTTP requests.
+* Based on **Promises** → cleaner and easier than older alternatives.
+* By default, `fetch()` uses **GET**, but it can be configured for **POST, PUT, DELETE, PATCH, etc.**
+
+### XMLHttpRequest (XHR)
+
+* Older JavaScript API for HTTP requests.
+* Foundation of the **AJAX** concept.
+* More verbose and callback-based compared to `fetch()`.
+
+### Other Methods
+
+* **window\.location.reload()** → Reloads the current page.
+* **HTML Forms** → Submitting a form sends data or reloads.
+* **Server-Sent Events (SSE):** → One-way stream from server to browser.
+* **window\.location.href = 'url'** → Redirects to another URL.
+
+---
+
+## 4. WebSocket
 
 * **Protocol for real-time, bidirectional communication** over a single TCP connection.
 * Unlike REST (request/response), WebSocket allows continuous data exchange.
@@ -315,24 +338,5 @@ while True:
 
 ---
 
-## 4. JavaScript Methods for Communication
 
-### fetch()
-
-* Modern **JavaScript** function for making HTTP requests.
-* Based on **Promises** → cleaner and easier than older alternatives.
-* By default, `fetch()` uses **GET**, but it can be configured for **POST, PUT, DELETE, PATCH, etc.**
-
-### XMLHttpRequest (XHR)
-
-* Older JavaScript API for HTTP requests.
-* Foundation of the **AJAX** concept.
-* More verbose and callback-based compared to `fetch()`.
-
-### Other Methods
-
-* **window\.location.reload()** → Reloads the current page.
-* **HTML Forms** → Submitting a form sends data or reloads.
-* **Server-Sent Events (SSE):** → One-way stream from server to browser.
-* **window\.location.href = 'url'** → Redirects to another URL.
 
