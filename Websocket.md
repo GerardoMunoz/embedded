@@ -194,11 +194,73 @@ But in practice, most webhook systems are custom, with similar but slightly diff
 
 ## 4. WebSocket
 
-* **Protocol for real-time, bidirectional communication** over a single TCP connection.
-* Unlike REST (request/response), WebSocket allows continuous data exchange.
-* Commonly used in **IoT**, **chat apps**, **real-time dashboards**.
+A **WebSocket** is a communication protocol that provides a **bidirectional, real-time** connection between a client (e.g., a browser) and a server. 
+
+Unlike traditional HTTP, where the client always initiates communication, WebSockets allow **both sides to send messages at any time**.
+
+
+###  Relationship with TCP and HTTP
+- WebSockets run **on top of TCP**, ensuring reliable and ordered transmission.
+- The connection starts as a **normal HTTP request**.
+- Then, the client requests an upgrade with the headers:
+  ```http
+  Upgrade: websocket
+  Connection: Upgrade
+  ```
+- If the server responds successfully, the protocol switches from HTTP to WebSocket on the same TCP channel.
+
+
+
+###  Advantages over traditional HTTP
+* **Real-time communication** without repeated polling.  
+* **Lower latency** and less network overhead.  
+* Perfect for **chats, online games, IoT, notifications, live dashboards**, etc.
+
+### Usage in JavaScript (client side)
+
+In the browser, you create a WebSocket with:
+```js
+let ws = new WebSocket("ws://server:port/");
+```
+
+### Main events:
+- **`onopen`** → when the connection opens.
+- **`onmessage`** → when a message is received from the server.
+- **`onclose`** → when the connection closes.
+- **`onerror`** → when an error occurs.
 
 Example:
+```js
+ws.onopen = () => console.log("Connected ✅");
+ws.onmessage = (e) => console.log("Message:", e.data);
+ws.onclose = () => console.log("Disconnected ❌");
+ws.onerror = (err) => console.error("Error:", err);
+
+ws.send("Hello server!");
+```
+
+
+
+### Connection flow
+
+1. Client → HTTP request with `Upgrade: websocket`.  
+2. Server → responds with **101 Switching Protocols**.  
+3. Connection established → both sides can send messages.  
+4. Connection closed by client or server.
+
+
+###  Real-world examples
+- Real-time chats (WhatsApp Web, Slack).  
+- Online multiplayer games.  
+- Financial data streaming.  
+- IoT: devices reporting live data.  
+- Remote control applications.
+
+
+
+
+
+### Example:
 
 ```javascript
 import network
