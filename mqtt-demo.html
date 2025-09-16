@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Demo MQTT (WebSocket) — Enviar y recibir</title>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 18px; color: #111; }
+    h1 { font-size: 20px; margin-bottom: 6px; }
+    p.lead { margin-top: 0; margin-bottom: 12px; color: #444; }
+    label { display:block; margin-top:10px; font-weight:600; font-size:13px; }
+    input[type=text], input[type=url], select, textarea {
+      width: 100%; padding:8px 10px; margin-top:6px; box-sizing:border-box; border-radius:6px; border:1px solid #ddd;
+    }
+    button { padding:8px 12px; border-radius:6px; border:none; background:#0066cc; color:white; cursor:pointer; }
+    button.secondary { background:#444; }
+    .row { display:flex; gap:12px; }
+    .col { flex:1; }
+    #log { height:260px; overflow:auto; border:1px solid #eee; padding:8px; background:#fafafa; border-radius:6px; white-space:pre-wrap; font-family:monospace; font-size:13px; }
+    .controls { display:flex; gap:8px; margin-top:12px; align-items:center; flex-wrap:wrap }
+    small.hint { color:#666; }
+    footer { margin-top:18px; color:#666; font-size:13px; }
+    .status { display:inline-block; padding:4px 8px; border-radius:999px; background:#eee; font-weight:600; }
+    .status.connected { background: #dff0d8; color:#2b6a2b; }
+    .status.disconnected { background:#fde6e6; color:#7a1a1a; }
+    .flex-between { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .small-input { width:120px; }
+  </style>
+</head>
+<body>
+  <h1>Demo MQTT (WebSocket) — Enviar y recibir</h1>
+  <p class="lead">Interfaz simple para conectarte a un broker MQTT vía WebSocket, suscribirte y publicar. Reemplaza la URL del broker por la que uses.</p>
+
+  <label>Broker WebSocket URL (ejemplos):
+    <input id="brokerUrl" type="url" value="wss://broker.hivemq.com:8884/mqtt" />
+    <small class="hint">Ejemplos: <code>ws://test.mosquitto.org:8080</code> (no TLS), <code>wss://broker.hivemq.com:8884/mqtt</code> (TLS). Verifica el endpoint WebSocket del broker.</small>
+  </label>
+
+  <div class="row">
+    <div class="col">
+      <label>Client ID
+        <input id="clientId" type="text" value="webclient-<?= Math.floor(Math.random()*10000) ?>" />
+      </label>
+    </div>
+    <div class="col">
+      <label>Username (opcional)
+        <input id="username" type="text" placeholder="usuario (opcional)" />
+      </label>
+    </div>
+    <div class="col">
+      <label>Password (opcional)
+        <input id="password" type="text" placeholder="contraseña (opcional)" />
+      </label>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="connectBtn">Conectar</button>
+    <button id="disconnectBtn" class="secondary" disabled>Desconectar</button>
+    <div style="margin-left:auto;">
+      Estado: <span id="statusBadge" class="status disconnected">desconectado</span>
+    </div>
+  </div>
+
+  <hr />
+
+  <div class="flex-between">
+    <div style="flex:1; margin-right:12px;">
+      <label>Suscribirse a topic
+        <input id="subTopic" type="text" value="sensores/+/suelo/+" />
+      </label>
+      <div style="margin-top:8px;">
+        <button id="subscribeBtn" class="secondary" disabled>Suscribir</button>
+        <button id="unsubscribeBtn" class="secondary" disabled>Desuscribir</button>
+      </div>
+    </div>
+
+    <div style="width:340px;">
+      <label>Publicar mensaje
+        <input id="pubTopic" type="text" value="sensores/roble/suelo/sensor1" />
+      </label>
+      <label>Payload (texto o JSON)
+        <textarea id="pubPayload" rows="3">{ "humedad": 42 }</textarea>
+      </label>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+        <label style="margin:0;">QoS
+          <select id="pubQos" class="small-input">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </label>
+        <label style="margin:0;">Retain
+          <select id="pubRetain" class="small-input">
+            <option value="false">false</option>
+            <option value="true">true</option>
+          </select>
+        </label>
+
+        <button id="publishBtn">Publicar</button>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:16px;">Registro de mensajes</h3>
+  <div id="log"></div>
+
+  <footer>
+    <p>Notas: asegúrate de que el broker soporte conexiones WebSocket. Si usas un broker local, habilita websocket en su configuración (p. ej. Mosquitto, EMQX, HiveMQ).</p>
+  </footer>
+
+  <!-- mqtt.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    // Elementos
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const brokerUrlInput = document.getElementById('brokerUrl');
+    const clientIdInput = document.getElementById('clientId');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const statusBadge = document.getElementById('statusBadge');
+
+    const subscribeBtn = document.getElementById('subscribeBtn');
+    const unsubscribeBtn = document.getElementById('unsubscribeBtn');
+    const subTopicInput = document.getElementById('subTopic');
+
+    const publishBtn = document.getElementById('publishBtn');
+    const pubTopicInput = document.getElementById('pubTopic');
+    const pubPayloadInput = document.getElementById('pubPayload');
+    const pubQosInput = document.getElementById('pubQos');
+    const pubRetainInput = document.getElementById('pubRetain');
+
+    const logEl = document.getElementById('log');
+
+    let client = null;
+    let currentSubscriptions = new Set();
+
+    function log(msg, type='info') {
+      const time = new Date().toLocaleTimeString();
+      logEl.textContent = `[${time}] ${msg}\n` + logEl.textContent;
+    }
+
+    function setStatus(connected) {
+      if (connected) {
+        statusBadge.textContent = 'conectado';
+        statusBadge.classList.remove('disconnected');
+        statusBadge.classList.add('connected');
+      } else {
+        statusBadge.textContent = 'desconectado';
+        statusBadge.classList.remove('connected');
+        statusBadge.classList.add('disconnected');
+      }
+    }
+
+    connectBtn.addEventListener('click', () => {
+      if (client && client.connected) { log('Ya estás conectado.'); return; }
+
+      const brokerUrl = brokerUrlInput.value.trim();
+      if (!brokerUrl) { alert('Especifica la URL WebSocket del broker.'); return; }
+
+      const clientId = clientIdInput.value || 'webclient-' + Math.floor(Math.random()*10000);
+      const username = usernameInput.value || undefined;
+      const password = passwordInput.value || undefined;
+
+      log(`Conectando a ${brokerUrl} con clientId=${clientId} ...`);
+      // opciones básicas; puedes ajustar keepalive, clean, etc.
+      const opts = {
+        clientId,
+        username,
+        password,
+        clean: true,
+        reconnectPeriod: 4000, // reintento automático
+        connectTimeout: 30 * 1000
+      };
+
+      try {
+        client = mqtt.connect(brokerUrl, opts);
+      } catch (err) {
+        log('Error creando conexión: ' + err.message);
+        return;
+      }
+
+      // Eventos
+      client.on('connect', (connack) => {
+        log('Conectado al broker. connack: ' + JSON.stringify(connack || {}));
+        setStatus(true);
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        subscribeBtn.disabled = false;
+        publishBtn.disabled = false;
+      });
+
+      client.on('reconnect', () => {
+        log('Intentando reconectar...');
+      });
+
+      client.on('close', () => {
+        log('Conexión cerrada.');
+        setStatus(false);
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        subscribeBtn.disabled = true;
+        unsubscribeBtn.disabled = true;
+        publishBtn.disabled = true;
+      });
+
+      client.on('offline', () => {
+        log('Cliente offline.');
+      });
+
+      client.on('error', (err) => {
+        log('Error: ' + (err && err.message ? err.message : JSON.stringify(err)));
+      });
+
+      client.on('message', (topic, payload, packet) => {
+        // Intentar parsear JSON si parece JSON
+        let text = payload.toString();
+        let parsed = null;
+        try {
+          parsed = JSON.parse(text);
+        } catch (e) { /* no es JSON */ }
+        const qos = packet && packet.qos != null ? packet.qos : '?';
+        const retain = packet && packet.retain ? ' [retained]' : '';
+        const display = parsed ? JSON.stringify(parsed, null, 2) : text;
+        log(`<< ${topic} (qos=${qos})${retain}\n${display}`);
+      });
+    });
+
+    disconnectBtn.addEventListener('click', () => {
+      if (!client) return;
+      log('Desconectando...');
+      client.end(false, {}, () => {
+        log('Desconectado (end).');
+        setStatus(false);
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        subscribeBtn.disabled = true;
+        unsubscribeBtn.disabled = true;
+        publishBtn.disabled = true;
+      });
+    });
+
+    subscribeBtn.addEventListener('click', () => {
+      if (!client || !client.connected) { alert('No conectado'); return; }
+      const topic = subTopicInput.value.trim();
+      if (!topic) return;
+      const qos = 0;
+      client.subscribe(topic, {qos}, (err, granted) => {
+        if (err) {
+          log('Error subscribe: ' + err.message);
+          return;
+        }
+        log(`Suscrito a "${topic}". granted: ${JSON.stringify(granted)}`);
+        currentSubscriptions.add(topic);
+        unsubscribeBtn.disabled = false;
+      });
+    });
+
+    unsubscribeBtn.addEventListener('click', () => {
+      if (!client || !client.connected) { alert('No conectado'); return; }
+      const topic = subTopicInput.value.trim();
+      if (!topic) return;
+      client.unsubscribe(topic, (err) => {
+        if (err) { log('Error unsubscribe: ' + err.message); return; }
+        log(`Desuscrito de "${topic}".`);
+        currentSubscriptions.delete(topic);
+        if (currentSubscriptions.size === 0) unsubscribeBtn.disabled = true;
+      });
+    });
+
+    publishBtn.addEventListener('click', () => {
+      if (!client || !client.connected) { alert('No conectado'); return; }
+      const topic = pubTopicInput.value.trim();
+      if (!topic) { alert('Especifica un topic'); return; }
+      let payload = pubPayloadInput.value;
+      // Si parece JSON, enviamos tal cual (string), broker no interpreta
+      const qos = Number(pubQosInput.value);
+      const retain = (pubRetainInput.value === 'true');
+      client.publish(topic, payload, {qos, retain}, (err) => {
+        if (err) log('Error publish: ' + err.message);
+        else log(`>> ${topic} (qos=${qos}) ${retain ? '[retained]' : ''}\n${payload}`);
+      });
+    });
+
+    // inicializar
+    setStatus(false);
+    // generar clientId razonable en carga
+    (function initClientId() {
+      const el = clientIdInput;
+      if (!el.value || el.value.startsWith('webclient-<?= ')) {
+        el.value = 'webclient-' + Math.floor(Math.random() * 90000 + 10000);
+      }
+    })();
+  </script>
+</body>
+</html>
