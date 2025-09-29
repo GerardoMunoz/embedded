@@ -15,5 +15,6 @@ Do not forget to copy in the same directory of your .c file pico_sdk_import.cmak
 * https://colab.research.google.com/github/GerardoMunoz/robots/blob/main/Car_dif_kinematics.ipynb
 * https://colab.research.google.com/github/GerardoMunoz/robots/blob/main/Arm_kinematics.ipynb
 * https://docs.opencv.org/4.x/d5/d10/tutorial_js_root.html
+  * https://gerardomunoz.github.io/Vision/image_manipulation/Image_colors.html  
 * https://www.kaggle.com/code/gerardomunoz/seminario-2019-x
 * https://www.tensorflow.org/js/tutorials?hl=es-419
