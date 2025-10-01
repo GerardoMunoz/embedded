@@ -58,21 +58,29 @@
 
         _build() {
           const base = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 0.5, 2),
+            new THREE.BoxGeometry(2, 0.5, 2),//(1, 0.3, .8),
             new THREE.MeshBasicMaterial({ color: 0x0077ff })
           );
+          base.position.y=0.3
           this.group.add(base);
           this.base = base;
 
-          const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 32);
+          const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 32);//(0.2, 0.2, 0.3, 32);
           const wheelMaterial = new THREE.MeshBasicMaterial({ color: 0x222222 });
 
           const wheelOffsets = [
-            [0.7, 0, 1.2],
-            [0.7, 0, -1.2],
-            [-0.7, 0, 1.2],
-            [-0.7, 0, -1.2],
+            [0.7, 0.4, 1.2],
+            [0.7, 0.4, -1.2],
+            [-0.7, 0.4, 1.2],
+            [-0.7, 0.4, -1.2],
           ];
+
+          // const wheelOffsets = [
+          //   [0.4, 0, 0.6],
+          //   [0.4, 0, -0.6],
+          //   [-0.4, 0, 0.6],
+          //   [-0.4, 0, -0.6],
+          // ];
 
           wheelOffsets.forEach(([x, y, z]) => {
             const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
@@ -205,11 +213,13 @@
         }
       }
 
+      // Three.js
+
       let selectedRobot = null;
       let cameraMode = "T";
 
       const width = window.innerWidth;
-      const height = window.innerHeight / 2;
+      const height = window.innerHeight ;
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0xf4f4f8);
 
@@ -227,8 +237,220 @@
       dir.position.set(5, 10, 7);
       scene.add(dir);
 
-      const grid = new THREE.GridHelper(60, 60);
+
+      ////////////////////////Escenario Piso, paredes 
+
+    const corridorWidth = 50;    // metros
+    const corridorLength = 200;  // metros
+    const tileSize = 10 / 3;       // 3.333333... metros (exacto para 15x60)
+    const tilesX = Math.round(corridorWidth / tileSize); // 15
+    const tilesZ = Math.round(corridorLength / tileSize); // 60
+
+    // número de variantes de textura procedural (menos repetición)
+    const tileVariants = 10;
+
+      const grid = new THREE.GridHelper(60,20);//(tileSize, tileSize);
       scene.add(grid);
+
+scene.background = new THREE.Color(0xdbe8f2);
+
+
+
+    function generateTileVariants(n, size = 256, chips = 150) {
+      const arr = [];
+      for (let k = 0; k < n; k++) {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+
+        // fondo cemento (ligeramente variable)
+        const base = 220 + Math.floor((Math.random()-0.5)*18);
+        ctx.fillStyle = `rgb(${base}, ${base}, ${base})`;
+        ctx.fillRect(0,0,size,size);
+
+        // pintar chips (aleatorio)
+        for (let i = 0; i < chips; i++) {
+          const x = Math.random() * size;
+          const y = Math.random() * size;
+          const r = 3 + Math.random() * 14;
+          ctx.beginPath();
+          // forma irregular simple con 5 vértices
+          for (let p = 0; p < 5; p++) {
+            const angle = (p / 5) * Math.PI * 2;
+            const rr = r * (0.5 + Math.random() * 1.0);
+            const px = x + Math.cos(angle) * rr;
+            const py = y + Math.sin(angle) * rr;
+            if (p === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+
+          // color de chip — gris/beige con ligera variación
+          const gbase = 100 + Math.random() * 100;
+          const rcol = Math.floor(gbase + (Math.random()-0.5)*30);
+          const gcol = Math.floor(gbase + (Math.random()-0.5)*30);
+          const bcol = Math.floor(gbase + (Math.random()-0.5)*30);
+          ctx.fillStyle = `rgb(${rcol},${gcol},${bcol})`;
+          ctx.fill();
+
+          // opcional borde oscuro muy sutil para profundidad
+          if (Math.random() < 0.12) {
+            ctx.strokeStyle = "rgba(0,0,0,0.06)";
+            ctx.lineWidth = Math.max(1, Math.random()*2);
+            ctx.stroke();
+          }
+        }
+
+        // // brillo local: pinta un gradiente sutil para simular barniz desigual
+        // const g = ctx.createLinearGradient(0, 0, size, size);
+        // g.addColorStop(0, 'rgba(255,255,255,0.00)');
+        // g.addColorStop(1, 'rgba(255,255,255,0.03)');
+        // ctx.fillStyle = g;
+        // ctx.fillRect(0,0,size,size);
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.encoding = THREE.sRGBEncoding;
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(1,1);
+        arr.push(tex);
+      }
+      return arr;
+    }
+
+    const variants = generateTileVariants(tileVariants);
+
+    // ---------- crear piso con baldosas individuales ----------
+    const floorGroup = new THREE.Group();
+    floorGroup.name = "floorGroup";
+
+    const tileGeo = new THREE.PlaneGeometry(tileSize, tileSize);
+    // small offset so we can "see" joints (gap)
+    const jointGap = 0.002; // 2mm gap between tiles
+    const effectiveTile = tileSize - jointGap;
+
+    for (let ix = 0; ix < tilesX; ix++) {
+      for (let iz = 0; iz < tilesZ; iz++) {
+        const variantIndex = Math.floor(Math.random() * variants.length);
+        const tex = variants[variantIndex];
+
+        // para menos repetición, rotamos la textura 0/90/180/270 aleatoriamente
+        const rotation = Math.floor(Math.random()*4) * (Math.PI/2);
+        // clonamos material por baldosa (se puede optimizar agrupando por variante)
+        const mat = new THREE.MeshPhysicalMaterial({
+          map: tex,
+          roughness: 0.55 + Math.random()*0.15,
+          metalness: 0.0,
+          clearcoat: 0.5,
+          clearcoatRoughness: 0.08 + Math.random()*0.08,
+          side: THREE.DoubleSide
+        });
+
+        const tile = new THREE.Mesh(tileGeo, mat);
+        tile.rotation.x = -Math.PI/2;
+        tile.position.x = (ix + 0.5) * tileSize - corridorWidth / 2;
+        tile.position.z = (iz + 0.5) * tileSize - corridorLength / 2;
+        tile.position.y = 0.0005; // elevar ligeramente para evitar z-fighting con base
+
+        // aplicar rotación de UV a la textura: usamos rotation en la textura
+        tex.center.set(0.5, 0.5);
+        tex.rotation = rotation;
+
+        // escalar ligeramente la malla para crear juntas visibles (no la textura)
+        tile.scale.set(effectiveTile / tileSize, 1, effectiveTile / tileSize);
+
+        tile.receiveShadow = true;
+        floorGroup.add(tile);
+      }
+    }
+
+    scene.add(floorGroup);
+
+
+
+
+
+
+
+// ---------- paredes ----------
+    // // paredes como grandes planos verticales en los lados del corredor
+    // const bhHeight = 3.0; // metros
+    // const gbThickness = 0.1;
+    // const bhMaterial = new THREE.MeshStandardMaterial({ color: 0xfff5e1 }); // crema
+
+    // // pared izquierda
+    // const bhWallGeo = new THREE.BoxGeometry(bhThickness, bhHeight, corridorLength + 0.2);
+    // const leftWall = new THREE.Mesh(leftWallGeo, wallMaterial);
+    // leftWall.position.set(-corridorWidth/2 - wallThickness/2, wallHeight/2, 0);
+    // leftWall.receiveShadow = true;
+    // leftWall.castShadow = false;
+    // scene.add(leftWall);
+
+    // // pared derecha
+    // const rightWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, corridorLength + 0.2);
+    // const rightWall = new THREE.Mesh(rightWallGeo, wallMaterial);
+    // rightWall.position.set(corridorWidth/2 + wallThickness/2, wallHeight/2, 0);
+    // rightWall.receiveShadow = true;
+    // scene.add(rightWall);
+
+    const wallHeight = 30.0; // decimetros
+    const wallThickness = 0.5;
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xfff5e1 }); // crema
+
+    // pared izquierda
+    const leftWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, corridorLength + 0.2);
+    const leftWall = new THREE.Mesh(leftWallGeo, wallMaterial);
+    leftWall.position.set(-corridorWidth/2 - wallThickness/2, wallHeight/2, 0);
+    leftWall.receiveShadow = true;
+    leftWall.castShadow = false;
+    scene.add(leftWall);
+
+    // pared derecha
+    const rightWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, corridorLength + 0.2);
+    const rightWall = new THREE.Mesh(rightWallGeo, wallMaterial);
+    rightWall.position.set(corridorWidth/2 + wallThickness/2, wallHeight/2, 0);
+    rightWall.receiveShadow = true;
+    scene.add(rightWall);
+
+    // // techo (opcional) - para ver el brillo en contexto, use techo alto semi-transparente
+    // const ceilingGeo = new THREE.PlaneGeometry(corridorWidth + 0.2, corridorLength + 0.2);
+    // const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    // const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
+    // ceiling.rotation.x = Math.PI/2;
+    // ceiling.position.y = wallHeight + 0.01;
+    // scene.add(ceiling);
+
+    // ---------- puertas cada 5 metros ----------
+    // colocamos puertas en ambas paredes, inicio a 2.5m, luego +5m (por tanto posiciones a z = -7.5, -2.5, 2.5, 7.5 ?)
+    // para un corridor de 20m, colocamos puertas centradas cada 5m empezando desde z = - (L/2) + 2.5
+    const doorInterval = 50.0;
+    const doorPositionsZ = [];
+    for (let z = -corridorLength/2 + doorInterval/2; z < corridorLength/2 + 0.0001; z += doorInterval) {
+      doorPositionsZ.push(parseFloat(z.toFixed(6)));
+    }
+
+    // puerta como marco sencillo (ancho 0.9m, alto 2.0m, profundidad 0.05)
+    const doorWidth = 9;
+    const doorHeight = 20.0;
+    const doorDepth = 0.5;
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, metalness: 0.05, roughness: 0.6 });
+
+    doorPositionsZ.forEach((zpos) => {
+      // lado derecho (pared x = +width/2)
+      const rightDoorGeo = new THREE.BoxGeometry(doorDepth, doorHeight, doorWidth);
+      const rightDoor = new THREE.Mesh(rightDoorGeo, woodMat);
+      //rightDoor.rotation.y = Math.PI/2;
+      rightDoor.position.set(corridorWidth/2 + wallThickness/2 + doorDepth/2 - 0.5, doorHeight/2, zpos);
+      scene.add(rightDoor);
+
+      // lado izquierdo (pared x = -width/2)
+      const leftDoorGeo = new THREE.BoxGeometry(doorDepth, doorHeight, doorWidth);
+      const leftDoor = new THREE.Mesh(leftDoorGeo, woodMat);
+      //leftDoor.rotation.y = -Math.PI/2;
+      leftDoor.position.set(-corridorWidth/2 - wallThickness/2 - doorDepth/2 + 0.5, doorHeight/2, zpos);
+      scene.add(leftDoor);
+    });
+
+
+      ///////////////////// Robots
 
       const n_bots = 10;
       const robots = [];
@@ -281,6 +503,8 @@
       let lastTime = performance.now();
       const keys = {};
 
+      ///////////// Teclados y Botones
+
       window.addEventListener("keydown", (e) => {
         keys[e.code] = true;
         if (e.code.startsWith("Digit")) {
@@ -300,6 +524,8 @@
         keys[e.code] = false;
       });
 
+
+    ////////////// Animación  
       const cameraSpeed = 0.01;
       const rotationSpeed = 0.002;
 
@@ -317,6 +543,8 @@
         updateCameraView();
         renderer.render(scene, camera);
       }
+
+      //////////////7 Help Func
 
       function selectRobot(idx) {
         if (robots[idx]) {
@@ -411,6 +639,9 @@
         if (keys["KeyJ"]) camera.position.x -= cameraSpeed;
         if (keys["KeyL"]) camera.position.x += cameraSpeed;
       }
+
+
+
     </script>
   </body>
 </html>
