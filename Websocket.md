@@ -477,6 +477,10 @@ while True:
 
 
 ```
-### Project
+### Project 1
 
 Create a server with a web page for remotely controlling the car and the arm, transmitting commands over WebSockets. At this stage, simply print the received information.
+
+### Project 2
+
+Extend Project 1 to support transmitting a command that returns an image. The implementation must handle sending image data over WebSocket, including managing the full size of the image. For testing, you may generate a sample image, such as vertical color bars.
