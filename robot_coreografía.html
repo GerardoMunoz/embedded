@@ -30,6 +30,7 @@
   <div id="render1"></div>
   <div id="render2"></div>
   <div id="controls">
+    <button onclick="coreografia()">Coreografía</button>
     <button onclick="selectRobot(0)">Robot 0</button>
     <button onclick="selectRobot(1)">Robot 1</button>
     <button onclick="setCameraMode('S')">Superior</button>
@@ -37,8 +38,16 @@
     <button onclick="setCameraMode('T')">Tercera</button>
     <button onclick="setCameraMode('B')">Brazo</button>
   </div>
+  <audio id="music" src="ymca.mp3"></audio>
 
   <script>
+    const music = document.getElementById("music");
+    //music.volume = 0.7;
+    //music.currentTime = 60; // minuto 1
+    //music.play();
+    //setTimeout(() => audio.pause(), 120000);7
+
+
     class Robot {
       constructor(scene, options = {}) {
         this.state = {
@@ -478,7 +487,11 @@
 
     for (let i = 0; i < n_bots; i++) {
       const robot = new Robot(scene, { x: (i - n_bots / 2) * 5, y: 0 });
-
+      robots.push(robot);
+    }
+function set_sequences(){
+    for (let i = 0; i < n_bots; i++) {
+      robot=robots[i]
       if (i % 2 == 0) {
         robot.setSequence([
           { v: 1, w: 0, alpha0: 0, time: 2 },
@@ -510,9 +523,9 @@
           { v: vel_lin, w: omega, time: tiempo },
         ]);
       }
-      robots.push(robot);
+      
     }
-
+  }
     let lastTime = performance.now();
     const keys = {};
     selectedRobot = robots[0]
@@ -639,6 +652,17 @@
           break;
         }
       }
+    }
+
+    function coreografia(){
+      music.volume = 0.7;
+      music.currentTime = 0; 
+      music.play().then(() => {
+        console.log("Música iniciada");
+        console.log("🎵 Duración total:", music.duration, "segundos");
+      }).catch(err => console.warn("Error al reproducir:", err));
+      setTimeout(() => music.pause(), 16000);
+      set_sequences()
     }
 
     function handleCameraControls() {
