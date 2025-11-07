@@ -19,4 +19,5 @@ Do not forget to copy in the same directory of your .c file pico_sdk_import.cmak
 * https://www.kaggle.com/code/gerardomunoz/seminario-2019-x
 * https://www.tensorflow.org/js/tutorials?hl=es-419
 * https://github.com/GerardoMunoz/uC_web_server/tree/main/RPiPicoMicroPython/ov7670_micropython
-* * https://github.com/GerardoMunoz/uC_web_server/tree/main/RPiPicoMicroPython/server_ws_pubsub
+* https://github.com/GerardoMunoz/uC_web_server/tree/main/RPiPicoMicroPython/server_ws_pubsub
+* https://colab.research.google.com/github/GerardoMunoz/embedded/blob/main/MultiTask.ipynb
