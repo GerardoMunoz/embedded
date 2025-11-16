@@ -668,7 +668,7 @@ class PubSubUI:
 
     def _log(self, text):
         ts = time.strftime("%H:%M:%S")
-        self.log_text.insert(END, f"[{ts}] {text}\n")
+        self.log_text.insert(END, f"[{ts}] {text[:50]}\n")
         self.log_text.see(END)
 
 

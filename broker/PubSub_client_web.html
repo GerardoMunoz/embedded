@@ -1,296 +1,334 @@
-<!DOCTYPE html>
-<html lang="es">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Cliente Pub/Sub WebSocket</title>
+  <meta charset="utf-8">
+  <title>Dashboard Pub/Sub</title>
+
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f2f2f2;
+      margin: 0; padding: 0;
+      background: #ececec;
+      font-family: system-ui, sans-serif;
     }
-    header {
-      background: #333;
-      color: #fff;
-      padding: 10px 15px;
+
+    h3 { margin: 0 0 8px 0; }
+
+    /* ---- GRID DE PANELES ---- */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 12px;
+      padding: 12px;
     }
-    main {
-      padding: 15px;
-    }
-    .row {
-      margin-bottom: 10px;
-    }
-    label {
-      font-weight: bold;
-      margin-right: 5px;
-    }
-    input[type="text"], textarea {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 4px;
-      font-family: monospace;
-    }
-    textarea {
-      height: 140px;
-      resize: vertical;
-    }
-    button {
-      margin: 2px;
-      padding: 6px 10px;
-      cursor: pointer;
-    }
-    fieldset {
-      border: 1px solid #ccc;
-      margin-bottom: 10px;
+
+    .panel {
       background: #fff;
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0px 2px 6px #0002;
     }
-    legend {
-      font-weight: bold;
-    }
+
+    /* ---- LOG ---- */
     #log {
-      width: 100%;
-      height: 220px;
-      background: #000;
+      background: #111;
       color: #0f0;
-      padding: 5px;
-      overflow-y: scroll;
+      height: 200px;
+      overflow-y: auto;
+      border-radius: 6px;
+      padding: 10px;
+      white-space: pre-wrap;
       font-family: monospace;
-      box-sizing: border-box;
     }
-    .small {
-      font-size: 0.85em;
-      color: #555;
+
+    /* ---- TOPIC FILTER BUTTONS ---- */
+    .topic-btn {
+      padding: 4px 8px;
+      background: #ccc;
+      border-radius: 6px;
+      border: none;
+      margin: 2px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .topic-btn.active {
+      background: #4caf50;
+      color: white;
+    }
+
+    /* ---- CANVAS CAMERA ---- */
+    #cam {
+      border: 1px solid #555;
+      image-rendering: pixelated;
+      width: 260px;
+      height: 320px;
+    }
+
+    input, button, textarea {
+      margin: 4px 0;
+      width: 100%;
+      padding: 6px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+
+    textarea {
+      height: 80px;
+      resize: vertical;
     }
   </style>
 </head>
-<body>
-<header>
-  <h2>Cliente Pub/Sub WebSocket</h2>
-</header>
-<main>
 
-  <!-- Conexión -->
-  <fieldset>
-    <legend>Conexión</legend>
-    <div class="row">
-      <label for="wsHost">Host:</label>
-      <input type="text" id="wsHost" value="localhost">
-    </div>
-    <div class="row">
-      <label for="wsPort">Puerto WS:</label>
-      <input type="text" id="wsPort" value="5052">
-    </div>
-    <div class="row">
+
+<body>
+  <div id="grid">
+
+    <!-- ========================================================= -->
+    <!-- PANEL 1: CONEXIÓN WS -->
+    <!-- ========================================================= -->
+    <section class="panel" id="panel-connection">
+      <h3>Conexión WebSocket</h3>
+
+      <label>IP del Broker:</label>
+      <input id="ip" value="192.168.1.3">
+
+      <label>Puerto:</label>
+      <input id="port" value="5052">
+
       <button id="btnConnect">Conectar</button>
       <button id="btnDisconnect" disabled>Desconectar</button>
-      <span id="status" class="small">Desconectado</span>
-    </div>
-  </fieldset>
 
-  <!-- Mensajes -->
-  <fieldset>
-    <legend>Mensajes</legend>
-
-    <div class="row">
-      <label for="topic">Tópico:</label>
-      <input type="text" id="topic" value="UDFJC/emb1/robot0/RPi/state">
-    </div>
-
-    <div class="row">
-      <label for="payload">Payload JSON:</label>
-      <textarea id="payload">{
-  "v": 0.2,
-  "w": 0.0,
-  "alfa0": 0,
-  "alfa1": 45,
-  "alfa2": 30,
-  "duration": 2.0
-}</textarea>
-    </div>
-
-    <div class="row">
-      <button id="btnSub">Suscribirse (SUB)</button>
-      <button id="btnPub">Publicar (PUB)</button>
-      <button id="btnAuto">Prueba automática</button>
-    </div>
-    <div class="row small">
-      Formato SUB: {"action":"SUB","topic":"..."}<br>
-      Formato PUB: {"action":"PUB","topic":"...","data":{...}}
-    </div>
-  </fieldset>
-
-  <!-- Log -->
-  <fieldset>
-    <legend>Log</legend>
-    <div id="log"></div>
-  </fieldset>
-</main>
-
-<script>
+      <p id="status">Desconectado</p>
+    </section>
+ <script>
+  /* ============================================================
+     CLIENTE WEBSOCKET
+  ============================================================ */
   let ws = null;
 
-  const wsHost = document.getElementById("wsHost");
-  const wsPort = document.getElementById("wsPort");
+  const statusBox = document.getElementById("status");
   const btnConnect = document.getElementById("btnConnect");
   const btnDisconnect = document.getElementById("btnDisconnect");
-  const statusSpan = document.getElementById("status");
 
-  const topicInput = document.getElementById("topic");
-  const payloadArea = document.getElementById("payload");
-  const btnSub = document.getElementById("btnSub");
-  const btnPub = document.getElementById("btnPub");
-  const btnAuto = document.getElementById("btnAuto");
+  btnConnect.onclick = () => {
+    const ip = document.getElementById("ip").value;
+    const port = document.getElementById("port").value;
 
-  const logDiv = document.getElementById("log");
+    const url = `ws://${ip}:${port}/ws`;
+    logBox.textContent += `Intentando conectar a ${url}\n`;
 
-  function log(msg) {
-    const ts = new Date().toLocaleTimeString();
-    logDiv.textContent += `[${ts}] ${msg}\n`;
-    logDiv.scrollTop = logDiv.scrollHeight;
-  }
-
-  function setConnected(connected) {
-    btnConnect.disabled = connected;
-    btnDisconnect.disabled = !connected;
-    btnSub.disabled = !connected;
-    btnPub.disabled = !connected;
-    btnAuto.disabled = !connected;
-    statusSpan.textContent = connected ? "Conectado" : "Desconectado";
-  }
-
-  btnConnect.addEventListener("click", () => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      log("Ya está conectado.");
-      return;
-    }
-    const host = wsHost.value.trim() || "localhost";
-    const port = wsPort.value.trim() || "5052";
-    const url = `ws://${host}:${port}`;
-
-    log(`Conectando a ${url} ...`);
-
-    try {
-      ws = new WebSocket(url);
-    } catch (e) {
-      log("Error creando WebSocket: " + e);
-      return;
-    }
+    ws = new WebSocket(url);
+    ws.binaryType = "arraybuffer";
 
     ws.onopen = () => {
-      log("Conectado al servidor WebSocket.");
-      setConnected(true);
-    };
-
-    ws.onmessage = (event) => {
-      const data = event.data;
-      try {
-        const obj = JSON.parse(data);
-        log("← Recibido: " + JSON.stringify(obj));
-      } catch (e) {
-        log("← (texto) " + data);
-      }
+      statusBox.textContent = "🟢 Conectado";
+      btnConnect.disabled = true;
+      btnDisconnect.disabled = true;
+      addLog("debug", "WS conectado");
     };
 
     ws.onclose = () => {
-      log("Conexión cerrada.");
-      setConnected(false);
+      statusBox.textContent = "🔴 Desconectado";
+      btnConnect.disabled = false;
+      btnDisconnect.disabled = true;
+      addLog("debug", "WS cerrado");
     };
 
-    ws.onerror = (err) => {
-      log("ERROR WebSocket: " + err);
+    ws.onerror = (e) => {
+      addLog("debug", "WS error: " + e.message);
     };
-  });
 
-  btnDisconnect.addEventListener("click", () => {
-    if (ws) {
-      ws.close();
-      ws = null;
-    }
-  });
+    ws.onmessage = (ev) => {
+        try {
+            msg = JSON.parse(ev.data);
+        } catch (e) {
+            console.error("JSON inválido:", e);
+            return;
+        }     
+        bus.publish(msg.topic, msg.data);
+    };
+  };
 
-  function sendJSON(obj) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      log("No conectado.");
-      return;
+  btnDisconnect.onclick = () => {
+    if (ws) ws.close();
+  };
+
+  </script>
+
+    <!-- ========================================================= -->
+    <!-- PANEL 2: ENVÍO DE MENSAJES -->
+    <!-- ========================================================= -->
+    <section class="panel" id="panel-messages">
+      <h3>Mensajes</h3>
+
+      <label>Tópico</label>
+      <input id="msgTopic" value="debug/msg">
+
+      <label>Payload JSON</label>
+      <textarea id="msgPayload">{ "hello": "world" }</textarea>
+
+      <button id="btnPub">Publicar</button>
+      <button id="btnSub">Suscribir</button>
+    </section>
+
+  <script>
+  /* ============================================================
+     PUBSUB LOCAL
+  ============================================================ */
+  class PubSub {
+    constructor() { this.subs = {}; }
+    subscribe(topic, cb) {
+      if (!this.subs[topic]) this.subs[topic] = [];
+      this.subs[topic].push(cb);
     }
-    const text = JSON.stringify(obj);
-    ws.send(text);
-    log("→ Enviado: " + text);
+    publish(topic, message) {
+      if (this.subs[topic]) this.subs[topic].forEach(cb => cb(message));
+      if (this.subs["*"])    this.subs["*"].forEach(cb => cb(topic, message));
+    }
+  }
+  const bus = new PubSub();
+
+  </script>
+   <script>
+  /* ============================================================
+     BOTONES PUB / SUB
+  ============================================================ */
+  document.getElementById("btnPub").onclick = () => {
+    if (!ws || ws.readyState != 1) return alert("WS no conectado");
+
+    const topic = document.getElementById("msgTopic").value;
+    const data = JSON.parse(document.getElementById("msgPayload").value);
+
+    const obj = { action: "PUB", topic, data };
+    ws.send(JSON.stringify(obj));
+    addLog(topic, "PUB enviado");
+  };
+
+  document.getElementById("btnSub").onclick = () => {
+    if (!ws || ws.readyState != 1) return alert("WS no conectado");
+
+    const topic = document.getElementById("msgTopic").value;
+    const obj = { action: "SUB", topic };
+    ws.send(JSON.stringify(obj));
+    addLog(topic, "SUB enviado");
+  };
+
+  </script>
+    <!-- ========================================================= -->
+    <!-- PANEL 3: LOG CON FILTROS -->
+    <!-- ========================================================= -->
+    <section class="panel" id="panel-log">
+      <h3>Log</h3>
+
+      <div id="filters"></div>
+      <pre id="log"></pre>
+    </section>
+<script>
+  /* ============================================================
+     LOG + FILTRO
+  ============================================================ */
+  const logBox = document.getElementById("log");
+  const filtersDiv = document.getElementById("filters");
+  const topicButtons = {};
+  let visibleTopics = new Set();
+
+  function addTopicButton(topic) {
+    if (topicButtons[topic]) return;
+    visibleTopics.add(topic);
+
+    const btn = document.createElement("button");
+    btn.className = "topic-btn active";
+    btn.textContent = topic;
+    btn.onclick = () => {
+      const active = btn.classList.toggle("active");
+      if (active) visibleTopics.add(topic);
+      else visibleTopics.delete(topic);
+    };
+
+    filtersDiv.appendChild(btn);
+    topicButtons[topic] = btn;
   }
 
-  btnSub.addEventListener("click", () => {
-    const topic = topicInput.value.trim();
-    if (!topic) {
-      log("Debe ingresar un tópico.");
-      return;
-    }
-    const pkt = { action: "SUB", topic: topic };
-    sendJSON(pkt);
+  function addLog(topic, txt) {
+    if (!topicButtons[topic]) addTopicButton(topic);
+    if (!visibleTopics.has(topic)) return;
+
+    logBox.textContent += `[${topic}] ${txt}\n`;
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  bus.subscribe("*", (topic, msg) => {
+    addLog(topic,  Object.keys(msg) );
   });
 
-  btnPub.addEventListener("click", () => {
-    const topic = topicInput.value.trim();
-    if (!topic) {
-      log("Debe ingresar un tópico.");
-      return;
+  </script>
+
+    <!-- ========================================================= -->
+    <!-- PANEL 4: VISUALIZADOR DE CÁMARA -->
+    <!-- ========================================================= -->
+    <section class="panel" id="panel-camera">
+      <h3>Cámara (camera/frame).</h3>
+
+      <canvas id="cam" width="160" height="120"></canvas>
+      <p id="camInfo"></p>
+    </section>
+
+  </div>
+
+  <script>
+  /* ============================================================
+     VISUALIZADOR DE CÁMARA (camera/frame con RGB565)
+  ============================================================ */
+  const canvas = document.getElementById("cam");
+  const ctx = canvas.getContext("2d");
+  const W = 160, H = 120;
+
+bus.subscribe("camera/frame", (payload) => {
+    let msg=payload;
+
+    const w = msg.w;
+    const h = msg.h;
+    const b64 = msg.frame_b64;
+
+    // --- Decodificar base64 a Uint8Array ---
+    const binary = atob(b64);      // decodifica base64 → string binario
+    const u8 = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+        u8[i] = binary.charCodeAt(i);
     }
-    let data;
-    try {
-      data = JSON.parse(payloadArea.value);
-    } catch (e) {
-      log("JSON inválido en payload: " + e);
-      return;
+
+    // --- Convertir RGB565 → RGBA ---
+    const img = ctx.createImageData(w, h);
+    const data = img.data;
+
+    for (let i = 0; i < u8.length; i += 2) {
+        const rgb565 = (u8[i] << 8) | u8[i+1];
+        const r = ((rgb565 >> 11) & 0x1F) << 3;
+        const g = ((rgb565 >> 5) & 0x3F) << 2;
+        const b = (rgb565 & 0x1F) << 3;
+
+        const idx = (i >> 1) * 4;
+        data[idx]   = r;
+        data[idx+1] = g;
+        data[idx+2] = b;
+        data[idx+3] = 255;
     }
-    const pkt = { action: "PUB", topic: topic, data: data };
-    sendJSON(pkt);
-  });
 
-  // Prueba automática similar a PubSub_client.py
-  btnAuto.addEventListener("click", () => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      log("Debe conectarse primero.");
-      return;
-    }
+    ctx.putImageData(img, 0, 0);
 
-    const topic_state = "UDFJC/emb1/robot0/RPi/state";
-    const topic_seq   = "UDFJC/emb1/robot0/RPi/sequence";
+    document.getElementById("camInfo").textContent =
+        `Frame RGB565 ~ ${u8.length} bytes (${w}x${h})`;
+});
 
-    // Suscribirse a ambos tópicos
-    sendJSON({ action: "SUB", topic: topic_state });
-    sendJSON({ action: "SUB", topic: topic_seq });
 
-    // Payloads como en el cliente TCP
-    const state_payload = {
-      v: 0.2, w: 0.0, alfa0: 0, alfa1: 45, alfa2: 30, duration: 2.0
-    };
+  </script>
 
-    const seq_payload = {
-      action: "create",
-      sequence: {
-        name: "saludo",
-        states: [
-          { v: 10,   w: 0,  alfa0: 0,   alfa1: 0, alfa2: 0, duration: 1.0 },
-          { v: 15.7, w: 90, alfa0: 0,   alfa1: 0, alfa2: 0, duration: 1.0 },
-          { v: 0,    w: 0,  alfa0: -90, alfa1: 0, alfa2: 0, duration: 1.0 }
-        ]
-      }
-    };
 
-    sendJSON({ action: "PUB", topic: topic_state, data: state_payload });
-    sendJSON({ action: "PUB", topic: topic_seq,   data: seq_payload });
-    sendJSON({
-      action: "PUB",
-      topic: topic_seq,
-      data: { action: "execute_now", name: "saludo" }
-    });
 
-    log("→ Prueba automática enviada.");
-  });
 
-  // Estado inicial
-  setConnected(false);
-</script>
 
+ 
+ 
 </body>
 </html>
+
