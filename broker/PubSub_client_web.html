@@ -165,10 +165,14 @@
 
 
       <label>Tópico</label>
-      <input id="msgTopic" value="debug/msg">
+      <input id="msgTopic" value="RPi/sequence">
 
       <label>Payload JSON</label>
-      <textarea id="msgPayload">{ "hello": "world" }</textarea>
+      <textarea id="msgPayload">{
+  "action": "execute_now",
+  "name": "ymca"
+}
+</textarea>
 
       <button id="btnPub">Publicar</button>
       <button id="btnSub">Suscribir</button>
@@ -206,7 +210,7 @@
 
     const obj = { action: "PUB", topic, data };
     ws.send(JSON.stringify(obj));
-    addLog(fullTopic, "PUB enviado");
+    addLog(topic, "PUB enviado");
   };
 
   document.getElementById("btnSub").onclick = () => {
@@ -217,7 +221,7 @@
     const topic = `${prefix}/${sufix}`;
     const obj = { action: "SUB", topic };
     ws.send(JSON.stringify(obj));
-    addLog(fullTopic, "SUB enviado");
+    addLog(topic, "SUB enviado");
   };
 
   </script>
@@ -371,66 +375,76 @@ import { CorridorScene } from "./3D/CorridorScene.js";
 import { RoDifArm } from "./3D/RoDifArm.js";
 
 const world = new CorridorScene(document.getElementById("render1"));
+///////////////////// Robots
+const n_bots =10
+const n_robot = 0
+//const bus=null
 
-// crear robot
-//const robot = new Robot(world.scene,bus);
+const robot = new RoDifArm(world, bus, { x: (n_robot - n_bots / 2) * 5, y: 0 });
 
+document.getElementById("btnStartCoreo").onclick = () => {
 
-  ///////////////////// Robots
-    const n_bots =10
-    const n_robot = 0
-    //const bus=null
+    const name = document.getElementById("coreoName").value.trim();
+    const coreo = name === "" ? "ymca" : name;
+    console.log('paner_twin',coreo)
+    //robot.runSequence(coreo);
 
-    const robot = new RoDifArm(world.scene, bus, { x: (n_robot - n_bots / 2) * 5, y: 0 });
+    // const msg = {
+    //     action: "PUB",
+    //     topic: camera_prefix+"/RPi/sequence",
+    //     data: {
+    //         "action": "execute_now",
+    //         "name": coreo
+    //         }
+    // };
 
-// function set_sequences(){
+    bus.publish(camera_prefix+"/RPi/sequence", {
+            "action": "execute_now",
+            "name": coreo
+            });
 
-//         robot.addSequence("ymca",[
-//           { v: 1, w: 0, alpha0: 0, time: 2 },
-//           { v: 0, w: -Math.PI / 4, alpha0: -Math.PI / 2, alpha1: 0, time: 2 },
-//           { v: vel_lin, w: omega, time: tiempo },
-//           {
-//             v: 0,
-//             w: 0,
-//             alpha0: Math.PI / 2,
-//             alpha1: (6 * Math.PI) / 16,
-//             alpha2: -(6 * Math.PI) / 16,
-//             time: 2,
-//           },
-//           { v: -vel_lin, w: omega, time: tiempo },
-//         ]);
-      
-//   }
-//     let lastTime = performance.now();
-//     const keys = {};
-//    selectedRobot = robot
-    
-    //camera2.position.set(0, 25, 25);
-    //camera2.lookAt(0, 0, 0);
+    // document.getElementById("coreoStatus").textContent =
+    //   `Coreografía enviada: ${coreo}`;
+};
 
 
- 
 
 
-    ////////////// Animación  
 
-    // animate();
-    // function animate() {
-    //   requestAnimationFrame(animate);
+    // const beat = 1;
+    // const n_beats = 5;
+    // const tiempo = n_beats * beat;
+    // const d = 1;
+    // const R = 2.5;
+    // const omega = Math.PI / tiempo;
+    // const vel_lin = omega * R;
 
-    //   const now = performance.now();
-    //   const deltaTime = (now - lastTime) / 1000;
-    //   lastTime = now;
-
-     
-    //   robot.update(deltaTime);
-
-     
-    //   renderer1.render(scene, camera1);//Global
-    // }
-
-    //////////////7 Help Func
-
+    // const sequences = {"ymca":[
+    //       { v: 1, w: 0, alpha0: 0, time: 2 },
+    //       { v: 0, w: -Math.PI / 4, alpha0: -Math.PI / 2, alpha1: 0, time: 2 },
+    //       { v: vel_lin, w: omega, time: tiempo },
+    //       {
+    //         v: 0,
+    //         w: 0,
+    //         alpha0: Math.PI / 2,
+    //         alpha1: (6 * Math.PI) / 16,
+    //         alpha2: -(6 * Math.PI) / 16,
+    //         time: 2,
+    //       },
+    //       { v: -vel_lin, w: omega, time: tiempo },
+    //       { v: 1, w: 0, alpha0: 0, time: 2 },
+    //       {
+    //         v: 0,
+    //         w: -Math.PI / 4,
+    //         alpha0: Math.PI / 2,
+    //         alpha1: (6 * Math.PI) / 16,
+    //         alpha2: -(6 * Math.PI) / 16,
+    //         time: 2,
+    //       },
+    //       { v: -vel_lin, w: omega, time: tiempo },
+    //       { v: 0, w: 0, alpha0: -Math.PI / 2, alpha1: 0, alpha2: 0, time: 2 },
+    //       { v: vel_lin, w: omega, time: tiempo },        
+    //     ]};
 
 
 

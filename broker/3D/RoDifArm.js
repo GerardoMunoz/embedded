@@ -3,46 +3,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.158/build/three.mod
 export class RoDifArm {
     constructor(scene, bus, options = {}) {
         this.bus = bus
-
-
-   bus.subscribe("UDFJC/emb1/robot0/RPi/state", (msg) => {
-        pose.beta = msg.w;
-        pose.x += msg.v * Math.cos(pose.beta);
-        pose.y += msg.v * Math.sin(pose.beta);
-
-        pose.a0 = msg.alfa0;
-        pose.a1 = msg.alfa1;
-        pose.a2 = msg.alfa2;
-    });
-
-
-
-    bus.subscribe("UDFJC/emb1/robot0/RPi/sequence", (msg) => {
-        if (msg.action === "create") {
-            sequences[msg.sequence.name] = msg.sequence.states;
-        }
-
-        if (msg.action === "execute_now") {
-            const seq = sequences[msg.name];
-            if (!seq) return;
-            runSequence(seq);
-        }
-    });
-
-
-        this.state = {
-            x: options.x ?? 0,
-            y: options.y ?? 0,
-            beta: options.beta ?? 0,
-            alpha0: options.alpha0 ?? 0,
-            alpha1: options.alpha1 ?? 0,
-            alpha2: options.alpha2 ?? 0,
-        };
-
-        this.group = new THREE.Group();
-        scene.add(this.group);
-
-        this._build();
+        
 
         const beat = 1;
         const n_beats = 5;
@@ -51,7 +12,6 @@ export class RoDifArm {
         const R = 2.5;
         const omega = Math.PI / tiempo;
         const vel_lin = omega * R;
-
 
         this.sequences = {"ymca":[
           { v: 1, w: 0, alpha0: 0, time: 2 },
@@ -79,10 +39,52 @@ export class RoDifArm {
           { v: -vel_lin, w: omega, time: tiempo },
           { v: 0, w: 0, alpha0: -Math.PI / 2, alpha1: 0, alpha2: 0, time: 2 },
           { v: vel_lin, w: omega, time: tiempo },        ]};
+
+        bus.subscribe("UDFJC/emb1/robot0/RPi/state", (msg) => {
+            pose.beta = msg.w;
+            pose.x += msg.v * Math.cos(pose.beta);
+            pose.y += msg.v * Math.sin(pose.beta);
+
+            pose.a0 = msg.alfa0;
+            pose.a1 = msg.alfa1;
+            pose.a2 = msg.alfa2;
+        });
         this.sequence = this.sequences["ymca"];
+        console.log('RoDifArm',this.sequence)
         this.currentStep = null;
         this.timeLeft = 0;
         this.initialAngles = {};
+
+
+
+        bus.subscribe("UDFJC/emb1/robot0/RPi/sequence", (msg) => {
+            if (msg.action === "create") {
+                this.sequences[msg.sequence.name] = msg.sequence.states;
+            }
+
+            if (msg.action === "execute_now") {
+                //const seq = this.sequences[msg.name];
+                if (!msg.name) return;
+                this.runSequence(msg.name);
+            }
+        });
+
+
+        this.state = {
+            x: options.x ?? 0,
+            y: options.y ?? 0,
+            beta: options.beta ?? 0,
+            alpha0: options.alpha0 ?? 0,
+            alpha1: options.alpha1 ?? 0,
+            alpha2: options.alpha2 ?? 0,
+        };
+
+        this.group = new THREE.Group();
+        scene.add(this.group);
+        scene.addAnimation(this)
+
+        this._build();
+
     }
 
     _build() {
@@ -166,9 +168,18 @@ export class RoDifArm {
 
     addSequence(name, sequence) {
         this.sequences[name] = sequence;
+        // this.currentStep = null;
+        // this.timeLeft = 0;
+        // this.sequence = sequence
+        this.runSequence(name);
+         console.log('addSequence','a',name,'b','c')
+    }
+
+    runSequence(name){
         this.currentStep = null;
         this.timeLeft = 0;
-        this.sequence = sequence
+        this.sequence = this.sequences[name];  
+        console.log('runSequence',this.sequence,'a',name,'b','c')      
     }
 
     _startNextStep() {
@@ -228,6 +239,7 @@ export class RoDifArm {
         this._render();
     }
 
+    
     _render() {
         this.group.position.set(this.state.x, 0, this.state.y);
         this.group.rotation.y = this.state.beta;

@@ -3,6 +3,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.158/build/three.mod
 export class CorridorScene {
     constructor(parentDiv) {
         this.parent = parentDiv;
+        this.animationObjects=[];
+        this.clock = new THREE.Clock();
 
         this.width = this.parent.clientWidth;   //window.innerWidth;
         this.height = this.parent.clientHeight;       //window.innerHeight / 2;
@@ -203,8 +205,14 @@ export class CorridorScene {
         const loop = () => {
             requestAnimationFrame(loop);
             this.renderer.render(this.scene, this.camera);
+            const dt = this.clock.getDelta();
+            this.animationObjects.forEach(function(obj){obj.update(dt)});
         };
         loop();
+    }
+
+    addAnimation(obj){
+        this.animationObjects.push(obj);
     }
 
     /* -------------------------------------------------------- */
