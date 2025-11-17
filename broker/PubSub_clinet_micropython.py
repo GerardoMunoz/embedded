@@ -7,10 +7,11 @@ import network, time, sys, gc
 import usocket as socket
 import ubinascii
 import json
-from machine import Pin, I2C, PWM
+from machine import Pin, I2C, PWM, Timer
 from ov7670_wrapper import *
 import _thread
 
+timer_flag = False
 # ----------------- CONFIG WIFI -----------------
 SSID = "PEREZ"
 with open(".env") as f:
@@ -33,7 +34,7 @@ print("✅ WiFi OK, IP:", wlan.ifconfig()[0])
 BROKER_HOST = "192.168.1.3"
 BROKER_PORT = 5051          # puerto del Broker TCP (Tkinter)
 
-TOPIC_FRAME = "camera/frame"
+TOPIC_FRAME = "UDFJC/emb1/robot0/camera/frame"
 SEND_INTERVAL = 3.0         # segundos entre envíos
 
 # ----------------- CÁMARA OV7670 -----------------
@@ -123,6 +124,7 @@ def publish_frame(sock):
 # ----------------- BUCLE PRINCIPAL -----------------
 
 def main_loop():
+    global timer_flag
     sock = None
     while True:
         try:
@@ -130,6 +132,13 @@ def main_loop():
                 sock = connect_to_broker()
             publish_frame(sock)
             time.sleep(SEND_INTERVAL)
+            if timer_flag:
+                timer_flag=False
+                send_json_line(sock,{
+                                "action": "PUB",
+                                "topic": "UDFJC/emb1/robot0/debug/msg",
+                                "data": {"text":"RPi WatchDog"}})
+                print("RPi WatchDog")
         except Exception as e:
             print("⚠ Error con broker:", e)
             # Cerrar socket y reintentar luego
@@ -143,5 +152,13 @@ def main_loop():
 
 # Opcional: podrías correrlo en un hilo
 # _thread.start_new_thread(main_loop, ())
+
+def timer_callback(timer):
+    global timer_flag
+    timer_flag = True
+    
+my_timer = machine.Timer()
+my_timer.init(mode=machine.Timer.PERIODIC, period=10000, callback=timer_callback)
+
 
 main_loop()
