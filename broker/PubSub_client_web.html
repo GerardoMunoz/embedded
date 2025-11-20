@@ -103,6 +103,13 @@
   /* ============================================================
      CLIENTE WEBSOCKET
   ============================================================ */
+  let CLIENT_MAC = localStorage.getItem("client_mac");
+  if (!CLIENT_MAC) {
+      CLIENT_MAC = crypto.randomUUID();
+      localStorage.setItem("client_mac", CLIENT_MAC);
+  }
+
+
   let ws = null;
 
   const statusBox = document.getElementById("status");
@@ -138,13 +145,18 @@
     };
 
     ws.onmessage = (ev) => {
+        //console.log('ws onmessage',ev);
+//        action: "PUB"
         try {
             msg = JSON.parse(ev.data);
         } catch (e) {
             console.error("JSON inválido:", e);
             return;
         }     
-        bus.publish(msg.topic, msg.data);
+        if (msg.action === "PUB") {
+                bus.publish(msg.topic, msg.data);
+                return;
+        }       // bus.publish(msg.topic, msg.data);
     };
   };
 
@@ -153,34 +165,25 @@
   };
 
   </script>
+<!-- ========================================================= -->
+<!-- PANEL 1.5: SUSCRIPCIONES ACTIVAS -->
+<!-- ========================================================= -->
+<section class="panel" id="panel-subs">
+  <h3>Suscripciones del PubSub</h3>
 
-    <!-- ========================================================= -->
-    <!-- PANEL 2: ENVÍO DE MENSAJES -->
-    <!-- ========================================================= -->
-    <section class="panel" id="panel-messages">
-      <h3>Mensajes</h3>
+  <button id="btnRefreshSubs">Actualizar</button>
 
-      <label>Prefijo del tópico</label>
-      <input id="topicPrefix" value="UDFJC/emb1/robot0">
+  <ul id="subsList" style="
+        list-style: none; 
+        padding-left: 0; 
+        font-family: monospace;
+        font-size: 0.85rem;">
+  </ul>
+</section>
 
-
-      <label>Tópico</label>
-      <input id="msgTopic" value="RPi/sequence">
-
-      <label>Payload JSON</label>
-      <textarea id="msgPayload">{
-  "action": "execute_now",
-  "name": "ymca"
-}
-</textarea>
-
-      <button id="btnPub">Publicar</button>
-      <button id="btnSub">Suscribir</button>
-    </section>
-
-  <script>
+<script>
 /* ============================================================
-   FUNCIÓN DE COMPARACIÓN DE TÓPICOS (wildcards estilo MQTT)
+   PANEL DE SUSCRIPCIONES DEL PUBSUB
    ============================================================ */
 function compareTopics(pattern, topic) {
     const p = pattern.split('/');
@@ -218,40 +221,115 @@ class PubSub {
     subscribe(pattern, cb) {
         if (!this.subs[pattern]) this.subs[pattern] = [];
         this.subs[pattern].push(cb);
+        refreshSubscriptionsPanel()
     }
 
     publish(topic, message) {
+        //console.log('publish',topic, message);
         for (const pattern in this.subs) {
             if (compareTopics(pattern, topic)) {
-                this.subs[pattern].forEach(cb => cb(message, topic));
+                this.subs[pattern].forEach(cb => cb(topic, message));//, topic
             }
         }
 
         // subscripción global '*'
         if (this.subs["*"]) {
-            this.subs["*"].forEach(cb => cb(topic, message));
+            this.subs["*"].forEach(cb => cb(topic,  message));//topic,
         }
     }
 }
 
 const bus = new PubSub();
-function read_prefix() {
-    // Declarar variable local (evitar global implícita)
-    let prefix = document.getElementById("topicPrefix").value.trim();
-    
-    // Asegurar formato correcto
-    if (prefix.endsWith('/')) prefix = prefix.slice(0, -1);
 
-    return prefix;
+const subsList = document.getElementById("subsList");
+const btnRefreshSubs = document.getElementById("btnRefreshSubs");
+
+function refreshSubscriptionsPanel() {
+    // Limpiar lista actual
+    subsList.innerHTML = "";
+
+    // Recorrer patrones registrados en el PubSub
+    for (const pattern in bus.subs) {
+        const count = bus.subs[pattern].length;
+
+        const li = document.createElement("li");
+        li.innerHTML = `
+            <b>${pattern}</b>
+            <span style="color:#888">(${count} callback${count!==1?'s':''})</span>
+        `;
+        subsList.appendChild(li);
+    }
 }
 
-// Inicializar prefix del bus
-bus.prefix = read_prefix();
+btnRefreshSubs.onclick = refreshSubscriptionsPanel;
 
-// Actualizar el prefix cuando cambie el input
-document.getElementById("topicPrefix").onchange = () => {
-    bus.prefix = read_prefix();
-};
+// Llenar al cargar la página
+refreshSubscriptionsPanel();
+</script>
+    <!-- ========================================================= -->
+    <!-- PANEL 2: ENVÍO DE MENSAJES -->
+    <!-- ========================================================= -->
+        <!-- ========================================================= -->
+    <!-- PANEL 2: ENVÍO DE MENSAJES -->
+    <!-- ========================================================= -->
+    <section class="panel" id="panel-messages">
+      <h3>Mensajes</h3>
+
+      <label>Prefijo base</label>
+      <input id="basePrefix" value="UDFJC/emb1">
+
+      <label>ID del robot</label>
+      <input id="robotId" type="number" value="0" min="0" step="1">
+
+      <label>Prefijo completo (solo lectura)</label>
+      <input id="fullPrefix" readonly>
+
+      <hr>
+
+      <label>Tópico (sufijo)</label>
+      <input id="msgTopic" value="RPi/sequence">
+
+      <label>Payload JSON</label>
+      <textarea id="msgPayload">{
+  "action": "execute_now",
+  "name": "ymca"
+}
+</textarea>
+
+      <button id="btnPub">Publicar</button>
+      <button id="btnSub">Suscribir</button>
+    </section>
+
+  <script>
+/* ============================================================
+   FUNCIÓN DE COMPARACIÓN DE TÓPICOS (wildcards estilo MQTT)
+   ============================================================ */
+
+// Inputs del panel de mensajes
+const basePrefixInput = document.getElementById("basePrefix");
+const robotIdInput    = document.getElementById("robotId");
+const fullPrefixInput = document.getElementById("fullPrefix");
+
+// Calcula bus.prefix = basePrefix + "/robot" + robotId
+function updatePrefix() {
+    let base = (basePrefixInput.value || "").trim();
+    if (base.endsWith("/")) base = base.slice(0, -1);
+
+    let robotId = (robotIdInput.value || "").trim();
+    if (robotId === "") robotId = "0";
+
+    bus.basePrefix = base;
+    bus.robotId    = robotId;
+    bus.prefix     = base + "/robot" + robotId;
+
+    fullPrefixInput.value = bus.prefix;
+}
+
+// Inicializar y enganchar eventos
+updatePrefix();
+basePrefixInput.onchange = updatePrefix;
+robotIdInput.onchange    = updatePrefix;
+
 
 
 /* ============================================================
@@ -273,8 +351,9 @@ bus.pub = function (topic, message) {
 };
 
 bus.pub_pre = function (sufijo, message) {
-    //const prefix = document.getElementById("topicPrefix").value.trim();
-    bus.pub(bus.prefix+'/'+sufijo,message)
+    let suf = (sufijo || "").trim();
+    if (suf.startsWith("/")) suf = suf.slice(1);
+    bus.pub(bus.prefix + "/" + suf, message);
 };
 
 bus.sub = function (topic, callback) {
@@ -293,31 +372,32 @@ bus.sub = function (topic, callback) {
 };
 
 bus.sub_pre = function (sufijo, callback) {
-    //const prefix = document.getElementById("topicPrefix").value.trim();
-    bus.sub(bus.prefix+'/'+sufijo,callback)
+    let suf = (sufijo || "").trim();
+    if (suf.startsWith("/")) suf = suf.slice(1);
+    bus.sub(bus.prefix + "/" + suf, callback);
 };
 /* ============================================================
    BOTONES PUB / SUB (actualizados para usar bus.pub y bus.sub)
    ============================================================ */
 
 document.getElementById("btnPub").onclick = () => {
-    const prefix = document.getElementById("topicPrefix").value.trim();
     const sufix = document.getElementById("msgTopic").value;
-    const topic = `${prefix}/${sufix}`;
-    const data = JSON.parse(document.getElementById("msgPayload").value);
+    const topic = `${bus.prefix}/${sufix}`;
+    const data  = JSON.parse(document.getElementById("msgPayload").value);
 
     bus.pub(topic, data);
 };
 
 document.getElementById("btnSub").onclick = () => {
-    const prefix = document.getElementById("topicPrefix").value.trim();
     const sufix = document.getElementById("msgTopic").value;
-    const topic = `${prefix}/${sufix}`;
+    const topic = `${bus.prefix}/${sufix}`;
 
     bus.sub(topic, (msg, t) => {
         addLog(t, "SUB recibió mensaje");
     });
 };
+
+
 
   </script>
     <!-- ========================================================= -->
@@ -363,7 +443,7 @@ document.getElementById("btnSub").onclick = () => {
     logBox.scrollTop = logBox.scrollHeight;
   }
 
-  bus.subscribe("*", (topic, msg) => {
+  bus.subscribe("*", (topic, msg) => {//topic,
     //console.log('bus.subscribe',msg)
     if (typeof msg === 'object'){
         addLog(topic,  Object.keys(msg) );
@@ -374,6 +454,8 @@ document.getElementById("btnSub").onclick = () => {
   });
  
   </script>
+
+
 
     <!-- ========================================================= -->
     <!-- PANEL 4: VISUALIZADOR DE CÁMARA -->
@@ -391,11 +473,12 @@ document.getElementById("btnSub").onclick = () => {
      VISUALIZADOR DE CÁMARA (camera/frame con RGB565)
   ============================================================ */
   const canvas = document.getElementById("cam");
-  const ctx = canvas.getContext("2d");
-  const W = 160, H = 120;
-  const camera_prefix = document.getElementById("topicPrefix").value.trim();
+const ctx = canvas.getContext("2d");
+const W = 160, H = 120;
 
-bus.subscribe(camera_prefix+"/camera/frame", (payload) => {
+// Se suscribe al tópico: <basePrefix>/robot<id>/camera/frame
+bus.sub_pre("camera/frame", (topic,payload) => {
+
     let msg=payload;
 
     const w = msg.w;
@@ -442,6 +525,7 @@ bus.subscribe(camera_prefix+"/camera/frame", (payload) => {
     <section class="panel" id="panel-gemelo">
       <h3>Gemelo</h3>
       <input id="coreoName" value="ymca">
+      <button id="btnSubRobot">Suscribir Robot</button>
       <button id="btnStartCoreo">Iniciar Coreografía</button>
       <div id="render1" style="width:100%; height:300px;"></div>
       <!--canvas id="canvas-gemelo" width="130" height="130"></canvas-->
@@ -470,10 +554,15 @@ import { RoDifArm } from "./3D/RoDifArm.js";
 const world = new CorridorScene(document.getElementById("render1"));
 ///////////////////// Robots
 const n_bots =10
-const n_robot = 0
+//
 //const bus=null
+document.getElementById("btnSubRobot").onclick = () =>{
+  const n_robot = Number(document.getElementById("robotId").value);
+  const robot = new RoDifArm(world, bus, { x: (n_robot - n_bots / 2) * 5, y: 0 });
+  //console.log('btnSubRobot listo')
+  //robot.attachSubscriptions()
+};
 
-const robot = new RoDifArm(world, bus, { x: (n_robot - n_bots / 2) * 5, y: 0 });
 
 document.getElementById("btnStartCoreo").onclick = () => {
 

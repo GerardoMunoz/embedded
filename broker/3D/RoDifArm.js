@@ -2,8 +2,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.158/build/three.mod
 
 export class RoDifArm {
     constructor(scene, bus, options = {}) {
-        this.bus = bus
-        
+        this.bus = bus;
+        this.scene = scene;
 
         const beat = 1;
         const n_beats = 5;
@@ -13,62 +13,36 @@ export class RoDifArm {
         const omega = Math.PI / tiempo;
         const vel_lin = omega * R;
 
-        this.sequences = {"ymca":[
-          { v: 1, w: 0, alpha0: 0, time: 2 },
-          { v: 0, w: -Math.PI / 4, alpha0: -Math.PI / 2, alpha1: 0, time: 2 },
-          { v: vel_lin, w: omega, time: tiempo },
-          {
-            v: 0,
-            w: 0,
-            alpha0: Math.PI / 2,
-            alpha1: (6 * Math.PI) / 16,
-            alpha2: -(6 * Math.PI) / 16,
-            time: 2,
-          },
-          { v: -vel_lin, w: omega, time: tiempo },
-          /////////////////////////////////////////////////////////
-          { v: 1, w: 0, alpha0: 0, time: 2 },
-          {
-            v: 0,
-            w: -Math.PI / 4,
-            alpha0: Math.PI / 2,
-            alpha1: (6 * Math.PI) / 16,
-            alpha2: -(6 * Math.PI) / 16,
-            time: 2,
-          },
-          { v: -vel_lin, w: omega, time: tiempo },
-          { v: 0, w: 0, alpha0: -Math.PI / 2, alpha1: 0, alpha2: 0, time: 2 },
-          { v: vel_lin, w: omega, time: tiempo },        ]};
-
-        bus.subscribe("UDFJC/emb1/robot0/RPi/state", (msg) => {
-            pose.beta = msg.w;
-            pose.x += msg.v * Math.cos(pose.beta);
-            pose.y += msg.v * Math.sin(pose.beta);
-
-            pose.a0 = msg.alfa0;
-            pose.a1 = msg.alfa1;
-            pose.a2 = msg.alfa2;
-        });
-        this.sequence = this.sequences["ymca"];
-        console.log('RoDifArm',this.sequence)
-        this.currentStep = null;
-        this.timeLeft = 0;
-        this.initialAngles = {};
-
-
-
-        bus.subscribe("UDFJC/emb1/robot0/RPi/sequence", (msg) => {
-            if (msg.action === "create") {
-                this.sequences[msg.sequence.name] = msg.sequence.states;
-            }
-
-            if (msg.action === "execute_now") {
-                //const seq = this.sequences[msg.name];
-                if (!msg.name) return;
-                this.runSequence(msg.name);
-            }
-        });
-
+        this.sequences = {
+            "ymca": [
+                { v: 1, w: 0, alpha0: 0, time: 4 },
+                { v: 0, w: -Math.PI / 4, alpha0: -Math.PI / 2, alpha1: 0, time: 2 },
+                { v: vel_lin, w: omega, time: tiempo },
+                {
+                    v: 0,
+                    w: 0,
+                    alpha0: Math.PI / 2,
+                    alpha1: (6 * Math.PI) / 16,
+                    alpha2: -(6 * Math.PI) / 16,
+                    time: 2,
+                },
+                { v: -vel_lin, w: omega, time: tiempo },
+                /////////////////////////////////////////////////////////
+                { v: 1, w: 0, alpha0: 0, time: 2 },
+                {
+                    v: 0,
+                    w: -Math.PI / 4,
+                    alpha0: Math.PI / 2,
+                    alpha1: (6 * Math.PI) / 16,
+                    alpha2: -(6 * Math.PI) / 16,
+                    time: 2,
+                },
+                { v: -vel_lin, w: omega, time: tiempo },
+                { v: 0, w: 0, alpha0: -Math.PI / 2, alpha1: 0, alpha2: 0, time: 2 },
+                { v: vel_lin, w: omega, time: tiempo },
+            ]
+        };
+        this.sequence = this.sequences["ymca"].map(step => ({...step}));
 
         this.state = {
             x: options.x ?? 0,
@@ -81,22 +55,57 @@ export class RoDifArm {
 
         this.group = new THREE.Group();
         scene.add(this.group);
-        scene.addAnimation(this)
+        scene.addAnimation(this);
 
         this._build();
 
+        this.currentStep = null;
+        this.timeLeft = 0;
+        this.initialAngles = {};
+        this.attachSubscriptions()
     }
+
+    /* ============================================================
+        NUEVO: Se llama desde el HTML cuando ya existe bus.prefix
+       ============================================================ */
+    attachSubscriptions() {
+        // Estado del robot
+        this.bus.sub_pre("RPi/state", (topic,msg) => {
+            console.log('msg',msg)
+            // this.state.beta = msg.w;
+            // this.state.v += msg.v;
+            // this.state.alpha0 = msg.alfa0;
+            // this.state.alpha1 = msg.alfa1;
+            // this.state.alpha2 = msg.alfa2;
+        });
+
+        // Secuencias
+        this.bus.sub_pre("RPi/sequence", (topic,msg) => {
+            if (msg.action === "create") {
+                console.log('create')
+                this.sequences[msg.sequence.name] = msg.sequence.states;
+            }
+
+            if (msg.action === "execute_now") {
+                if (!msg.name) return;
+                this.runSequence(msg.name);
+            }
+        });
+
+        console.log("RoDifArm: suscripciones activadas para", this.bus.prefix);
+    }
+
 
     _build() {
         const base = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 0.5, 2),//(1, 0.3, .8),
+            new THREE.BoxGeometry(2, 0.5, 2),
             new THREE.MeshBasicMaterial({ color: 0x0077ff })
         );
-        base.position.y = 0.3
+        base.position.y = 0.3;
         this.group.add(base);
         this.base = base;
 
-        const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 32);//(0.2, 0.2, 0.3, 32);
+        const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 32);
         const wheelMaterial = new THREE.MeshBasicMaterial({ color: 0x222222 });
 
         const wheelOffsets = [
@@ -105,7 +114,6 @@ export class RoDifArm {
             [-0.7, 0.4, 1.2],
             [-0.7, 0.4, -1.2],
         ];
-
 
         wheelOffsets.forEach(([x, y, z]) => {
             const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
@@ -158,28 +166,18 @@ export class RoDifArm {
         wrist.add(hand);
     }
 
-    moveTo(delta = {}) {
-        Object.entries(delta).forEach(([key, value]) => {
-            if (this.state.hasOwnProperty(key)) {
-                this.state[key] += value;
-            }
-        });
-    }
-
     addSequence(name, sequence) {
-        this.sequences[name] = sequence;
-        // this.currentStep = null;
-        // this.timeLeft = 0;
-        // this.sequence = sequence
+        //console.log('addSequence')
+        this.sequences[name] = sequence.map(step => ({...step}));
         this.runSequence(name);
-         console.log('addSequence','a',name,'b','c')
     }
 
-    runSequence(name){
+    runSequence(name) {
+        //console.log('run-')
         this.currentStep = null;
         this.timeLeft = 0;
-        this.sequence = this.sequences[name];  
-        console.log('runSequence',this.sequence,'a',name,'b','c')      
+        this.sequence = this.sequences[name].map(step => ({...step}));
+        //console.log('run-',this.sequence.length)
     }
 
     _startNextStep() {
@@ -187,7 +185,9 @@ export class RoDifArm {
             this.currentStep = null;
             return;
         }
+        //console.log("_startNextStep 0",this.sequence.length,this.sequences['ymca'].length)
         this.currentStep = this.sequence.shift();
+        //console.log("_startNextStep 1",this.sequence.length,this.sequences['ymca'].length)
         this.timeLeft = this.currentStep.time;
 
         this.initialAngles = {
@@ -198,6 +198,7 @@ export class RoDifArm {
     }
 
     update(deltaTime) {
+        //console.log("update",this.sequence.length,this.sequences['ymca'].length)
         if (!this.currentStep) {
             this._startNextStep();
             if (!this.currentStep) {
@@ -206,22 +207,11 @@ export class RoDifArm {
             }
         }
 
-        const {
-            x = this.state.x,
-            y = this.state.y,
-            beta = this.state.beta,
-            v = this.state.v,
-            w = this.state.w,
-            alpha0 = this.state.alpha0,
-            alpha1 = this.state.alpha1,
-            alpha2 = this.state.alpha2,
-        } = this.currentStep;
-
-        this.state.x += v * Math.cos(this.state.beta) * deltaTime;
-        this.state.y -= v * Math.sin(this.state.beta) * deltaTime;
-        this.state.beta += (this.currentStep.w ?? 0) * deltaTime;
-
         const t = 1 - this.timeLeft / this.currentStep.time;
+
+        this.state.x += this.currentStep.v * Math.cos(this.state.beta) * deltaTime;
+        this.state.y -= this.currentStep.v * Math.sin(this.state.beta) * deltaTime;
+        this.state.beta += (this.currentStep.w ?? 0) * deltaTime;
 
         ["alpha0", "alpha1", "alpha2"].forEach((key) => {
             if (this.currentStep[key] !== undefined) {
@@ -239,7 +229,6 @@ export class RoDifArm {
         this._render();
     }
 
-    
     _render() {
         this.group.position.set(this.state.x, 0, this.state.y);
         this.group.rotation.y = this.state.beta;
@@ -248,25 +237,4 @@ export class RoDifArm {
         this.shoulder.rotation.z = this.state.alpha1;
         this.elbow.rotation.z = this.state.alpha2 - this.state.alpha1;
     }
-
-
- 
-    // async function runSequence(states) {
-    //     for (const s of states) {
-    //         pose.beta = s.w;
-    //         pose.x += s.v * Math.cos(pose.beta);
-    //         pose.y += s.v * Math.sin(pose.beta);
-    //         pose.a0 = s.alfa0;
-    //         pose.a1 = s.alfa1;
-    //         pose.a2 = s.alfa2;
-    //         await wait(s.duration * 1000);
-    //     }
-    // }
-
-    // function wait(ms) {
-    //     return new Promise(res => setTimeout(res, ms));
-    // }
-
-
 }
-
