@@ -179,50 +179,145 @@
     </section>
 
   <script>
-  /* ============================================================
-     PUBSUB LOCAL
-  ============================================================ */
-  class PubSub {
+/* ============================================================
+   FUNCIÓN DE COMPARACIÓN DE TÓPICOS (wildcards estilo MQTT)
+   ============================================================ */
+function compareTopics(pattern, topic) {
+    const p = pattern.split('/');
+    const t = topic.split('/');
+
+    for (let i = 0; i < p.length; i++) {
+
+        // '#' coincide con cualquier cantidad de niveles (solo final)
+        if (p[i] === '#') return true;
+
+        // '+' coincide con exactamente un nivel
+        if (p[i] === '+') {
+            if (i >= t.length) return false;
+            continue;
+        }
+
+        // Si el patrón es más largo que el tópico → no coincide
+        if (i >= t.length) return false;
+
+        // comparación exacta
+        if (p[i] !== t[i]) return false;
+    }
+
+    // Si sobraron niveles en el tópico → no coincide
+    return p.length === t.length;
+}
+
+
+/* ============================================================
+   PUBSUB LOCAL CON WILDCARDS
+   ============================================================ */
+class PubSub {
     constructor() { this.subs = {}; }
-    subscribe(topic, cb) {
-      if (!this.subs[topic]) this.subs[topic] = [];
-      this.subs[topic].push(cb);
+
+    subscribe(pattern, cb) {
+        if (!this.subs[pattern]) this.subs[pattern] = [];
+        this.subs[pattern].push(cb);
     }
+
     publish(topic, message) {
-      if (this.subs[topic]) this.subs[topic].forEach(cb => cb(message));
-      if (this.subs["*"])    this.subs["*"].forEach(cb => cb(topic, message));
+        for (const pattern in this.subs) {
+            if (compareTopics(pattern, topic)) {
+                this.subs[pattern].forEach(cb => cb(message, topic));
+            }
+        }
+
+        // subscripción global '*'
+        if (this.subs["*"]) {
+            this.subs["*"].forEach(cb => cb(topic, message));
+        }
     }
-  }
-  const bus = new PubSub();
+}
 
-  </script>
-   <script>
-  /* ============================================================
-     BOTONES PUB / SUB
-  ============================================================ */
-  document.getElementById("btnPub").onclick = () => {
-    if (!ws || ws.readyState != 1) return alert("WS no conectado");
+const bus = new PubSub();
+function read_prefix() {
+    // Declarar variable local (evitar global implícita)
+    let prefix = document.getElementById("topicPrefix").value.trim();
+    
+    // Asegurar formato correcto
+    if (prefix.endsWith('/')) prefix = prefix.slice(0, -1);
 
+    return prefix;
+}
+
+// Inicializar prefix del bus
+bus.prefix = read_prefix();
+
+// Actualizar el prefix cuando cambie el input
+document.getElementById("topicPrefix").onchange = () => {
+    bus.prefix = read_prefix();
+};
+
+
+/* ============================================================
+   EXTENSIONES DEL BUS: API PUB / SUB PARA TODA LA PÁGINA
+   ============================================================ */
+
+bus.pub = function (topic, message) {
+    // Publicación local
+    bus.publish(topic, message);
+
+    // Enviar al WebSocket si está activo
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const obj = { action: "PUB", topic, data: message };
+        ws.send(JSON.stringify(obj));
+        addLog(topic, "PUB → WS");
+    } else {
+        addLog(topic, "PUB (solo local, WS no conectado)");
+    }
+};
+
+bus.pub_pre = function (sufijo, message) {
+    //const prefix = document.getElementById("topicPrefix").value.trim();
+    bus.pub(bus.prefix+'/'+sufijo,message)
+};
+
+bus.sub = function (topic, callback) {
+    // Suscripción local con wildcards
+    bus.subscribe(topic, callback);
+    addLog(topic, "SUB local registrado");
+
+    // Suscripción remota por WebSocket
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const obj = { action: "SUB", topic };
+        ws.send(JSON.stringify(obj));
+        addLog(topic, "SUB → WS enviado");
+    } else {
+        addLog(topic, "SUB (solo local, WS no conectado)");
+    }
+};
+
+bus.sub_pre = function (sufijo, callback) {
+    //const prefix = document.getElementById("topicPrefix").value.trim();
+    bus.sub(bus.prefix+'/'+sufijo,callback)
+};
+/* ============================================================
+   BOTONES PUB / SUB (actualizados para usar bus.pub y bus.sub)
+   ============================================================ */
+
+document.getElementById("btnPub").onclick = () => {
     const prefix = document.getElementById("topicPrefix").value.trim();
     const sufix = document.getElementById("msgTopic").value;
     const topic = `${prefix}/${sufix}`;
     const data = JSON.parse(document.getElementById("msgPayload").value);
 
-    const obj = { action: "PUB", topic, data };
-    ws.send(JSON.stringify(obj));
-    addLog(topic, "PUB enviado");
-  };
+    bus.pub(topic, data);
+};
 
-  document.getElementById("btnSub").onclick = () => {
-    if (!ws || ws.readyState != 1) return alert("WS no conectado");
-
+document.getElementById("btnSub").onclick = () => {
     const prefix = document.getElementById("topicPrefix").value.trim();
     const sufix = document.getElementById("msgTopic").value;
     const topic = `${prefix}/${sufix}`;
-    const obj = { action: "SUB", topic };
-    ws.send(JSON.stringify(obj));
-    addLog(topic, "SUB enviado");
-  };
+
+    bus.sub(topic, (msg, t) => {
+        addLog(t, "SUB recibió mensaje");
+    });
+};
 
   </script>
     <!-- ========================================================= -->
@@ -269,17 +364,15 @@
   }
 
   bus.subscribe("*", (topic, msg) => {
-    console.log('bus.subscribe',msg)
+    //console.log('bus.subscribe',msg)
     if (typeof msg === 'object'){
         addLog(topic,  Object.keys(msg) );
     }
     else {
         addLog(topic, msg );
     }
-
-   
   });
-
+ 
   </script>
 
     <!-- ========================================================= -->
@@ -386,7 +479,7 @@ document.getElementById("btnStartCoreo").onclick = () => {
 
     const name = document.getElementById("coreoName").value.trim();
     const coreo = name === "" ? "ymca" : name;
-    console.log('paner_twin',coreo)
+    //console.log('paner_twin',coreo)
     //robot.runSequence(coreo);
 
     // const msg = {
@@ -398,7 +491,7 @@ document.getElementById("btnStartCoreo").onclick = () => {
     //         }
     // };
 
-    bus.publish(camera_prefix+"/RPi/sequence", {
+    bus.pub_pre("RPi/sequence", {
             "action": "execute_now",
             "name": coreo
             });
@@ -409,7 +502,15 @@ document.getElementById("btnStartCoreo").onclick = () => {
 
 
 
-
+//   bus.sub_pre("/RPi/sequence", (topic, msg) => {
+//     console.log('bus.subscribe',msg)
+//     if (typeof msg === 'object'){
+//         addLog(topic,  Object.keys(msg) );
+//     }
+//     else {
+//         addLog(topic, msg );
+//     }
+//   });
 
     // const beat = 1;
     // const n_beats = 5;
