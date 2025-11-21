@@ -42,7 +42,7 @@ export class RoDifArm {
                 { v: vel_lin, w: omega, time: tiempo },
             ]
         };
-        this.sequence = this.sequences["ymca"].map(step => ({...step}));
+        this.sequence = []// this.sequences["ymca"].map(step => ({...step}));
 
         this.state = {
             x: options.x ?? 0,

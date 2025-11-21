@@ -404,8 +404,7 @@ class PubSubGUI:
     def update_video(self):
         frame = self.video_thread.latest_frame
         if frame is not None:
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            #rgb = cv2.flip(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), 1)
+            rgb = cv2.flip(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), 1)
             img = Image.fromarray(rgb)
             self.photo = ImageTk.PhotoImage(image=img)
             self.lbl_video.config(image=self.photo)

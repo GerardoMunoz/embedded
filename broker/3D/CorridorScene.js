@@ -13,7 +13,7 @@ export class CorridorScene {
         this.scene.background = new THREE.Color(0xf4f4f8);
 
         this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 1000);
-        this.camera.position.set(0, 25, 25);
+        this.camera.position.set(-25, 25, 0);
         this.camera.lookAt(0, 0, 0);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });

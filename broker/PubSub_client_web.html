@@ -229,6 +229,7 @@ class PubSub {
         for (const pattern in this.subs) {
             if (compareTopics(pattern, topic)) {
                 this.subs[pattern].forEach(cb => cb(topic, message));//, topic
+                console.log('publish',topic,this.subs[pattern],message)
             }
         }
 
@@ -282,7 +283,7 @@ refreshSubscriptionsPanel();
       <input id="robotId" type="number" value="0" min="0" step="1">
 
       <label>Prefijo completo (solo lectura)</label>
-      <input id="fullPrefix" readonly>
+      <input id="fullPrefix" >
 
       <hr>
 
@@ -311,26 +312,27 @@ const robotIdInput    = document.getElementById("robotId");
 const fullPrefixInput = document.getElementById("fullPrefix");
 
 // Calcula bus.prefix = basePrefix + "/robot" + robotId
-function updatePrefix() {
+function updatePrefixFromParts() {
     let base = (basePrefixInput.value || "").trim();
     if (base.endsWith("/")) base = base.slice(0, -1);
 
     let robotId = (robotIdInput.value || "").trim();
     if (robotId === "") robotId = "0";
 
-    bus.basePrefix = base;
-    bus.robotId    = robotId;
-    bus.prefix     = base + "/robot" + robotId;
-
-    fullPrefixInput.value = bus.prefix;
+    fullPrefixInput.value = base + "/robot" + robotId;
+    bus.prefix = fullPrefixInput.value;
 }
 
 // Inicializar y enganchar eventos
-updatePrefix();
-basePrefixInput.onchange = updatePrefix;
-robotIdInput.onchange    = updatePrefix;
+updatePrefixFromParts()
+basePrefixInput.onchange = updatePrefixFromParts;
+robotIdInput.onchange = updatePrefixFromParts;
+fullPrefixInput.onchange = updatePrefixFromFull;
 
 
+function updatePrefixFromFull() {
+    bus.prefix = fullPrefixInput.value.trim();
+}
 
 /* ============================================================
    EXTENSIONES DEL BUS: API PUB / SUB PARA TODA LA PÁGINA
@@ -558,7 +560,7 @@ const n_bots =10
 //const bus=null
 document.getElementById("btnSubRobot").onclick = () =>{
   const n_robot = Number(document.getElementById("robotId").value);
-  const robot = new RoDifArm(world, bus, { x: (n_robot - n_bots / 2) * 5, y: 0 });
+  const robot = new RoDifArm(world, bus, { x:0, y: (n_robot - n_bots / 2) * 5 });
   //console.log('btnSubRobot listo')
   //robot.attachSubscriptions()
 };
