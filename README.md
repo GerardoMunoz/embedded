@@ -1,7 +1,10 @@
 # Embedded systems
 Do not forget to copy in the same directory of your .c file pico_sdk_import.cmake from pico-sdk/external 
 
+* https://github.com/GerardoMunoz/embedded/blob/main/energy_units_and_regulator_efficiency.md
+* https://github.com/GerardoMunoz/embedded/blob/main/Embedded_Systems_Energy_Class.md
 * https://github.com/GerardoMunoz/Curso_Python/blob/main/Taller_RPI_GPIO.docx
+* https://github.com/GerardoMunoz/embedded/blob/main/doc/RP-008373-DS-2-rp2350-datasheet.pdf
 * https://github.com/GerardoMunoz/Curso_Python/blob/main/Comparaci%C3%B3n_while_IRQ_PIO.ipynb
 * https://github.com/GerardoMunoz/Curso_Python/blob/main/IR_control.ipynb
 * https://github.com/GerardoMunoz/Curso_Python/blob/main/ADC_upy_DMA.ipynb
