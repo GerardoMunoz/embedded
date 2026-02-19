@@ -16,12 +16,12 @@ Applies an immediate state to the robot, setting linear/angular velocities and a
 
 ```json
 {
-  "v": 0.2,        // linear velocity [dm/s]
-  "w": 0.0,        // angular velocity [°/s]
-  "alfa0": 0,      // joint 0 angle [°]
-  "alfa1": 45,     // joint 1 angle [°]
-  "alfa2": 30,     // joint 2 angle [°]
-  "duration": 2.0  // time in seconds to maintain this state
+  "v_dm/s": 0.2,        // linear velocity [dm/s]
+  "w_deg/s": 0.0,        // angular velocity [°/s]
+  "alfa0_deg": 0,      // joint 0 angle [°]
+  "alfa1_deg": 45,     // joint 1 angle [°]
+  "alfa2_deg": 30,     // joint 2 angle [°]
+  "duration_s": 2.0  // time in seconds to maintain this state
 }
 ```
 
@@ -47,17 +47,16 @@ Manage the sequences
 // Create a sequence
 {
   "action": "create",
-  "sequence": {
-    "name": "saludo",
-    "states": [
-        { "v": 10, "w": 0, "alfa0": 0, "alfa1": 0, "alfa2": 0, "duration": 1.0 },
-        { "v": 15.7, "w": 90, "alfa0": 0, "alfa1": 0, "alfa2": 0, "duration": 1.0 },
-        { "v": 0, "w": 0, "alfa0": -90, "alfa1": 0, "alfa2": 0, "duration": 1.0 },
-        { "v": 0, "w": 0, "alfa0": 90, "alfa1": 0, "alfa2": 0, "duration": 2.0 },
-        { "v": 0, "w": 0, "alfa0": 0, "alfa1": 90, "alfa2": 0, "duration": 1.0 },
-        { "v": 0, "w": 0, "alfa0": 0, "alfa1": 0, "alfa2": 90, "duration": 1.0 }
-     ]
-  }
+  "name": "saludo",
+  "time": "2025-09-25T20:00:00Z",
+  "states": [
+      { "v_dm/s": 10, "w_deg/s": 0, "alfa0_deg": 0, "alfa1_deg": 0, "alfa2_deg": 0, "duration_s": 1.0 },
+      { "v_dm/s": 15.7, "w_deg/s": 90, "alfa0_deg": 0, "alfa1_deg": 0, "alfa2_deg": 0, "duration_s": 1.0 },
+      { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": -90, "alfa1_deg": 0, "alfa2_deg": 0, "duration_S": 1.0 },
+      { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": 90, "alfa1_deg": 0, "alfa2_deg": 0, "duration_s": 2.0 },
+      { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": 0, "alfa1_deg": 90, "alfa2_deg": 0, "duration_s": 1.0 },
+      { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": 0, "alfa1_deg": 0, "alfa2_deg": 90, "duration_s": 1.0 }
+   ]
 }
 
 // Delete a sequence
@@ -91,5 +90,6 @@ Manage the sequences
 ### Topic base:
 
 `UDFJC/emb1/robot0/RPi/bezier`
+
 
 To be defined
