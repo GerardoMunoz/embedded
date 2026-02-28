@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RPi Pico + MicroPython</title>
+
+<style>
+body {
+    background:#1e1e1e;
+    color:white;
+    font-family:Arial;
+    display:flex;
+    gap:30px;
+    padding:20px;
+}
+
+.board {
+    background:#0b6b3a;
+    width:260px;
+    padding:15px;
+    border-radius:20px;
+}
+
+.pins {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+}
+
+.pin {
+    height:28px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+    background:#444;
+    color:white;
+    font-size:12px;
+}
+
+.pin.active {
+    background:#00ff88;
+    color:black;
+}
+
+textarea {
+    width:400px;
+    height:400px;
+    background:#111;
+    color:#00ff88;
+    padding:10px;
+    font-family:monospace;
+}
+
+button.run {
+    margin-top:10px;
+    padding:10px;
+    cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="board">
+    <h3>RPi Pico</h3>
+    <div class="pins" id="pins"></div>
+</div>
+
+<div>
+    <h3>MicroPython Code</h3>
+    <textarea id="code">
+#from machine import Pin
+
+led = Pin(0, Pin.OUT)
+led.value(1)
+
+test = Pin(5, Pin.OUT)
+test.value(1)
+
+#led.value(0)
+    </textarea>
+    <br>
+    <button class="run" id="runBtn">Run</button>
+</div>
+
+<script type="module">
+import { loadMicroPython } from "./micropython.mjs";
+
+const mp = await loadMicroPython();
+
+/* -------------------------
+   JSON state model
+-------------------------- */
+let pinState = {};
+for (let i = 0; i <= 27; i++) {
+    pinState[i] = 0;
+}
+
+/* -------------------------
+   Board Rendering
+-------------------------- */
+const pinContainer = document.getElementById("pins");
+
+function renderPins() {
+    document.querySelectorAll(".pin").forEach(btn => {
+        const num = parseInt(btn.dataset.pin);
+        btn.classList.toggle("active", pinState[num] === 1);
+    });
+}
+
+for (let i = 0; i <= 27; i++) {
+    const btn = document.createElement("button");
+    btn.className = "pin";
+    btn.innerText = "GP" + i;
+    btn.dataset.pin = i;
+
+    btn.onclick = () => {
+        pinState[i] = pinState[i] ? 0 : 1;
+        renderPins();
+    };
+
+    pinContainer.appendChild(btn);
+}
+
+/* -------------------------
+   Expose JS function to MicroPython
+-------------------------- */
+globalThis.setPinFromPython = (pin, value) => {
+    pinState[pin] = value;
+    renderPins();
+};
+
+/* -------------------------
+   Inject Custom Pin class
+-------------------------- */
+await mp.runPython(`
+class Pin:
+    OUT = 1
+    IN = 0
+
+    def __init__(self, number, mode):
+        self.number = number
+        self.mode = mode
+
+    def value(self, v=None):
+        if v is None:
+            return 0
+        else:
+            import js
+            js.setPinFromPython(self.number, v)
+`);
+
+/* -------------------------
+   Run user code
+-------------------------- */
+document.getElementById("runBtn").onclick = async () => {
+    const code = document.getElementById("code").value;
+    try {
+        await mp.runPython(code);
+    } catch (err) {
+        console.error(err);
+        alert(err);
+    }
+};
+
+renderPins();
+</script>
+
+</body>
+</html>
