@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mechanism Viewer</title>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            color: white;
+            font-family: monospace
+        }
+
+        #panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #222;
+            padding: 10px;
+            border-radius: 6px
+        }
+
+        label {
+            display: block;
+            margin-top: 6px
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <label>alpha1 <input id="alpha1" type="range" min="0" max="180" value="90"><div id="lab_a1"></div></label>
+        <label>alpha2 <input id="alpha2" type="range" min="90" max="205" value="180"><div id="lab_a2"></div></label>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+
+        // ================= JSON =================
+
+        const model = {
+            "cte": { "beta1": 165, "beta2": 90, "beta3": 105 },
+            "var": { "alpha1": 90, "alpha2": 180 },
+            "li": {
+                "A": { "nodes": ["a", "b"], "l": 0.4 },
+                "B": { "nodes": ["a", "d"], "l": 0.8 },
+                "C": { "nodes": ["d", "c"], "l": 0.4 },
+                "D": { "nodes": ["c", "b"], "l": 0.8 },
+                "E": { "nodes": ["d", "f"], "l": 0.35 },
+                "F": { "nodes": ["f", "e"], "l": 0.8 },
+                "G": { "nodes": ["a", "e"], "l": 0.35 },
+                "H": { "nodes": ["c", "g"], "l": 0.45 },
+                "I": { "nodes": ["d", "g"], "l": 0.2 },
+                "J": { "nodes": ["d", "i"], "l": 0.8 },
+                "K": { "nodes": ["i", "h"], "l": 0.2 },
+                "L": { "nodes": ["g", "h"], "l": 0.8 },
+                "M": { "nodes": ["i", "j"], "l": 0.25 }
+            },
+            "jo": {
+                "a": { "transforms": [{ "parent": null }] },
+                "b": {
+                    "transforms": [
+                        { "parent": "a" },
+                        { "Rz": "@cte.beta1" },
+                        { "T": "@li.A" }]
+                },
+                "d": {
+                    "transform": [
+                        { "parent": "a" },
+                        { "Rz": "@var.alpha1" },
+                        { "T": "@li.B" }]
+                },
+                "c": { "fbl": "a,b,d,D,C" },
+                "e": {
+                    "transform": [
+                        { "parent": "a" },
+                        { "Rz": "@var.alpha2" },
+                        { "T": "@li.G" }]
+                },
+                "f": { "fbl": "a,d,e,E,F" },
+                "g": {
+                    "transform": [
+                        { "parent": "d" },
+                        { "Rz": "@ang(c,d) + @cte.beta2" },
+                        { "T": "@li.I" }]
+                },
+                "i": {
+                    "transform": [
+                        { "parent": "d" },
+                        { "Rz": "@ang(f,d)" },
+                        { "T": "@li.J" }]
+                },
+                "h": { "fbl": "d,g,i,L,K" },
+                "j": {
+                    "transform": [
+                        { "parent": "i" },
+                        { "Rz": "@ang(h,i) + @cte.beta3" },
+                        { "T": "@li.M" }]
+                }
+            }
+        }
+
+        // ================= SCENE =================
+
+        const scene = new THREE.Scene()
+
+        const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 100)
+        camera.position.set(0, 0, 4)
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true })
+        renderer.setSize(innerWidth, innerHeight)
+        document.body.appendChild(renderer.domElement)
+
+        scene.add(new THREE.AxesHelper(1))
+
+        // ================= CONTEXT =================
+
+        const context = {
+            joints: {},
+            cte: model.cte,
+            var: model.var
+        }
+
+        // ================= VISUAL STORAGE =================
+
+        const jointMeshes = {}
+        const linkLines = []
+
+        // ================= SOLVER =================
+
+        function solveJoint(name) {
+
+            if (context.joints[name]) return
+
+            const j = model.jo[name]
+
+            if (j.fbl) {
+
+                const [Aname, Bname, Dname, L2name, L3name] = j.fbl.split(",")
+
+                solveJoint(Aname)
+                solveJoint(Bname)
+                solveJoint(Dname)
+
+                const A = context.joints[Aname]
+                const B = context.joints[Bname]
+                const D = context.joints[Dname]
+
+                const L2 = model.li[L2name].l
+                const L3 = model.li[L3name].l
+
+                context.joints[name] = fbl(A, D, B, L2, L3, -1)
+
+                return
+            }
+
+            const transforms = j.transforms || j.transform
+            if (!transforms) return
+
+            let parent = null
+            let angle = 0
+            let length = 0
+
+            transforms.forEach(t => {
+
+                if (t.parent) {
+                    parent = t.parent
+                    solveJoint(parent)
+                }
+
+                if (t.Rz) {
+                    angle = evaluateExpression(t.Rz, context)
+                    angle = THREE.MathUtils.degToRad(angle)
+                }
+
+                if (t.T) {
+                    const liName = t.T.replace("@li.", "")
+                    length = model.li[liName].l
+                }
+
+            })
+
+            const P = context.joints[parent]
+
+            const x = P.x + length * Math.cos(angle)
+            const y = P.y + length * Math.sin(angle)
+
+            context.joints[name] = new THREE.Vector3(x, y, 0)
+
+        }
+
+        // ================= BUILD VISUALS =================
+
+        function buildScene() {
+
+            Object.keys(model.jo).forEach(name => {
+
+                const mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.03),
+                    new THREE.MeshBasicMaterial({ color: 0xff4444 })
+                )
+
+                jointMeshes[name] = mesh
+                scene.add(mesh)
+
+                const label = createLabel(name)
+                label.position.set(0.05,0.05,0)
+
+                mesh.add(label)
+
+            })
+
+            Object.values(model.li).forEach(link => {
+
+                const geo = new THREE.BufferGeometry()
+                const line = new THREE.Line(
+                    geo,
+                    new THREE.LineBasicMaterial({ color: 0xffffff })
+                )
+
+                linkLines.push({ line, link })
+
+                scene.add(line)
+
+            })
+
+        }
+
+        // ================= UPDATE MECHANISM =================
+
+        function updateMechanism() {
+
+            context.joints = {}
+
+            context.joints.a = new THREE.Vector3(0, 0, 0)
+
+            Object.keys(model.jo).forEach(solveJoint)
+
+            // update joint meshes
+            Object.entries(context.joints).forEach(([name, pos]) => {
+                jointMeshes[name].position.copy(pos)
+            })
+
+            // update links
+            linkLines.forEach(obj => {
+
+                const A = context.joints[obj.link.nodes[0]]
+                const B = context.joints[obj.link.nodes[1]]
+
+                if (!A || !B) return
+
+                obj.line.geometry.setFromPoints([A, B])
+
+            })
+
+        }
+
+        // ================= SLIDERS =================
+
+        const alpha1Slider = document.getElementById("alpha1")
+        const alpha2Slider = document.getElementById("alpha2")
+        const lab_a1Slider = document.getElementById("lab_a1")
+        const lab_a2Slider = document.getElementById("lab_a2")
+
+        alpha1Slider.oninput = () => {
+            let alpha1 = parseFloat(alpha1Slider.value)
+            let alpha2 = parseFloat(alpha2Slider.value)
+            //if (Math.abs(alpha1-alpha2)<5){
+            //    alpha1=alpha2
+            //    alpha1Slider.value=alpha1
+            //}
+            context.var.alpha1 = alpha1
+            lab_a1Slider.innerText=alpha1
+            updateMechanism()
+        }
+
+        alpha2Slider.oninput = () => {
+            let alpha1 = parseFloat(alpha1Slider.value)
+            let alpha2 = parseFloat(alpha2Slider.value)
+            //if (Math.abs(alpha1-alpha2)<5){
+            //    alpha1Slider.value=alpha2
+            //}
+            context.var.alpha2 = alpha2
+            lab_a2Slider.innerText=alpha2
+            updateMechanism()
+        }
+
+        // ================= LOOP =================
+
+        function animate() {
+            requestAnimationFrame(animate)
+            renderer.render(scene, camera)
+        }
+
+        // ================= INIT =================
+
+        buildScene()
+        updateMechanism()
+        animate()
+
+        // ================= YOUR FUNCTIONS =================
+
+        function fbl(A, D, B, L2, L3, elbow = 1) {
+
+            const AB = new THREE.Vector3().subVectors(B, A);
+            const BD = new THREE.Vector3().subVectors(D, B);
+
+            const d = BD.length();
+            const ex = BD.clone().normalize();
+
+            const a = (L2 * L2 - L3 * L3 + d * d) / (2 * d);
+
+            const h2 = L2 * L2 - a * a;
+            if (h2 < 0) return null;
+
+            const h = Math.sqrt(h2);
+
+            const P = B.clone().add(ex.clone().multiplyScalar(a));
+
+            const normal = new THREE.Vector3()
+                .crossVectors(AB, BD)
+                .normalize();
+
+            const ey = new THREE.Vector3()
+                .crossVectors(normal, ex)
+                .normalize();
+
+            return P.clone().add(ey.multiplyScalar(elbow * h));
+        }
+
+        function evaluateExpression(expr, context) {
+
+            expr = expr.replace(/@ang\((\w+),(\w+)\)/g, (m, a, b) => {
+
+                const A = context.joints[a]
+                const B = context.joints[b]
+                //console.log('A,B',A,B)
+
+                return Math.atan2(
+                    B.y - A.y,
+                    B.x - A.x
+                ) * 180 / Math.PI
+
+            })
+
+            expr = expr.replace(/@cte\.(\w+)/g, (m, name) => {
+                return context.cte[name]
+            })
+
+            expr = expr.replace(/@var\.(\w+)/g, (m, name) => {
+                return context.var[name]
+            })
+
+            return Function("return " + expr)()
+        }
+
+        function createLabel(text){
+
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+
+    canvas.width = 256
+    canvas.height = 128
+
+ctx.fillStyle="black"
+ctx.fillRect(0,0,256,128)
+
+ctx.fillStyle="white"    
+ctx.font = "100px monospace"
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+
+    ctx.fillText(text,128,64)
+
+    const texture = new THREE.CanvasTexture(canvas)
+
+    const material = new THREE.SpriteMaterial({map:texture})
+
+    const sprite = new THREE.Sprite(material)
+
+    sprite.scale.set(0.15,0.08,1)
+
+    return sprite
+}
+
+    </script>
+</body>
+
+</html>
