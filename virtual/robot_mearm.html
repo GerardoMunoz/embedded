@@ -51,10 +51,11 @@
 
         class MeArm {
 
-            constructor(scene, model) {
+            constructor(scene, model,tag="NoTag") {
 
                 this.scene = scene
                 this.model = model
+                this.tag=tag
                 //this.num_servos= model.cte.num_servos
                 this.PWM_min= model.cte.PWM_min
                 this.PWM_max= model.cte.PWM_max
@@ -95,7 +96,7 @@
                 for (let i = 0; i < PWMs.length; i++) {
                     if (PWMs[i] !== undefined && PWMs[i] !== null){
                         this.context.var["alpha"+i]=(PWMs[i]-this.PWM_min)/(this.PWM_max-this.PWM_min)*180+this.alpha_min[i]
-                        console.log("alpha"+i+":",PWMs[i],this.context.var["alpha"+i])
+                        console.log(this.tag+" alpha"+i+":",PWMs[i],this.context.var["alpha"+i])
                     }
                 }
                 console.log()
@@ -190,7 +191,7 @@
                 Object.keys(this.model.jo).forEach(name => {
 
                     const mesh = new THREE.Mesh(
-                        new THREE.SphereGeometry(0.03),
+                        new THREE.SphereGeometry(0.04),
                         new THREE.MeshBasicMaterial({ color: 0xff4444 })
                     )
 
@@ -376,7 +377,10 @@
           alpha0: options.alpha0 ?? 0,
           alpha1: options.alpha1 ?? 0,
           alpha2: options.alpha2 ?? 0,
+          
+
         };
+        this.tag=options.tag ?? "NoTag"
 
         this.group = new THREE.Group();
         scene.add(this.group);
@@ -434,7 +438,7 @@
         armBase.translateX(0.6);
         base.add(armBase);
         this.armBase = armBase;
-        this.arm= new MeArm(armBase,model)
+        this.arm= new MeArm(armBase,model,this.tag)
     
       }
 
@@ -520,7 +524,7 @@
         this.arm.setPWMs([
             this.deg2dutyCycle(this.state.alpha0+Math.PI/2),
             this.deg2dutyCycle(this.state.alpha1),
-            this.deg2dutyCycle(Math.PI-this.state.alpha2 ),
+            this.deg2dutyCycle(this.state.alpha2-Math.PI/2 ),
         ])
         //this.armBase.rotation.y = this.state.alpha0;
         //this.shoulder.rotation.z = this.state.alpha1;
@@ -539,7 +543,7 @@
     scene.background = new THREE.Color(0xf4f4f8);
 
     const camera1 = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
-    camera1.position.set(0, 25, 25);
+    camera1.position.set(0, 10, 10);
     camera1.lookAt(0, 0, 0);
 
     const camera2 = new THREE.PerspectiveCamera(30, 320/240, 0.1, 1000);
@@ -774,7 +778,7 @@
 
     ///////////////////// Robots
 
-    const n_bots = 10;
+    const n_bots = 4;
     const robots = [];
 
     const beat = 1;
@@ -786,12 +790,18 @@
     const vel_lin = omega * R;
 
     for (let i = 0; i < n_bots; i++) {
-      const robot = new Robot(scene, { x: (i - n_bots / 2) * 5, y: 0 });
+      const robot = new Robot(scene, { x: (i - n_bots / 2) * 5, y: 0, tag:i });
       robots.push(robot);
     }
 function set_sequences(){
     for (let i = 0; i < n_bots; i++) {
       robot=robots[i]
+    //   robot.setSequence([
+    //     { v: 0, w: 0, alpha0: -Math.PI / 2, alpha1:  Math.PI / 2, alpha2:  Math.PI/4 , time: 2 },
+    //     { v: 0, w: 0, alpha0: 0, alpha1:  Math.PI / 2, alpha2:  0 , time: 2 },
+    //     { v: 0, w: 0, alpha0: +Math.PI / 2, alpha1:  Math.PI / 2, alpha2:  -Math.PI/4 , time: 2 },
+
+    // ])
       if (i % 2 == 0) {
         robot.setSequence([
           { v: 1, w: 0, alpha0: 0, alpha1: Math.PI / 2, time: 2 },
