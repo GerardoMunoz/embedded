@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mechanism Viewer</title>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            color: white;
+            font-family: monospace
+        }
+
+        #panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #222;
+            padding: 10px;
+            border-radius: 6px
+        }
+
+        label {
+            display: block;
+            margin-top: 6px
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <label>alpha0 <input id="pwm0" type="range" min="5" max="10" value="7.5" step="0.1">
+            <div id="lab_pwm0"></div>
+        </label>
+        <label>alpha1 <input id="pwm1" type="range" min="5" max="10" value="7.5" step="0.1">
+            <div id="lab_pwm1"></div>
+        </label>
+        <label>alpha2 <input id="pwm2" type="range" min="5" max="10" value="7.5" step="0.1">
+            <div id="lab_pwm2"></div>
+        </label>
+        <div id="inv_kin"></div>
+        <div id="inv_kin_2link"></div>
+        <div id="debug"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+
+
+
+
+        class MeArm {
+
+            constructor(scene, model) {
+
+                this.scene = scene
+                this.model = model
+                //this.num_servos= model.cte.num_servos
+                this.PWM_min = model.cte.PWM_min
+                this.PWM_max = model.cte.PWM_max
+                this.alpha_min = []
+                this.numServos = Number(model.cte.num_servos);
+
+                //if (!Number.isInteger(this.numServos) || this.numServos < 0) {
+                //    throw new Error("num_servos must be a non-negative integer");
+                //}
+
+                for (let i = 0; i < this.numServos; i++) {
+                    this.alpha_min.push(model.cte["alpha" + i + "_min"])
+                }
+
+                console.log('ini servos', this.PWM_min, this.PWM_max, this.numServos, this.alpha_min)
+
+
+
+                this.context = {
+                    joints: {},
+                    cte: model.cte,
+                    var: model.var
+                }
+
+                this.jointMeshes = {}
+                this.jointMeshes2 = {}
+                this.linkMeshes = []
+
+                this.root = new THREE.Group()
+                scene.add(this.root)
+
+                this.buildVisuals()
+                this.update()
+            }
+
+            // ---------- PUBLIC API ----------
+
+            setPWMs(PWMs) {
+                for (let i = 0; i < PWMs.length; i++) {
+                    if (PWMs[i] !== undefined && PWMs[i] !== null) {
+                        this.context.var["alpha" + i] = (PWMs[i] - this.PWM_min) / (this.PWM_max - this.PWM_min) * 180 + this.alpha_min[i]
+                    }
+                }
+                this.update()
+            }
+
+            setRotation(angleDeg) {
+                this.root.rotation.z = THREE.MathUtils.degToRad(angleDeg)
+            }
+
+            update() {
+                this.updateMechanisms()
+
+                this.updateVisuals()
+            }
+
+            updateMechanisms() {
+                this.context.joints = {}
+                this.context.joints.a = new THREE.Vector3(0, 0, 0)
+                Object.keys(this.model.jo).forEach(name => this.solveJoint(name))
+            }
+
+            // ---------- SOLVER ----------
+
+            solveJoint(name) {
+
+                if (this.context.joints[name]) return
+
+                const j = this.model.jo[name]
+
+                if (j.fbl) {
+                    this.solveFBL(name, j)
+                    return
+                }
+
+                const transforms = j.transforms || j.transform
+                if (!transforms) return
+
+                let parent = null
+                let angle = 0
+                let length = 0
+
+                transforms.forEach(t => {
+
+                    if (t.parent) {
+                        parent = t.parent
+                        this.solveJoint(parent)
+                    }
+
+                    if (t.Rz) {
+                        angle = this.evaluateExpression(t.Rz)
+                        angle = THREE.MathUtils.degToRad(angle)
+                    }
+
+                    if (t.T) {
+                        const liName = t.T.replace("@li.", "")
+                        length = this.model.li[liName].l
+                    }
+
+                })
+
+                const P = this.context.joints[parent]
+
+                const x = P.x + length * Math.cos(angle)
+                const y = P.y + length * Math.sin(angle)
+
+                this.context.joints[name] = new THREE.Vector3(x, y, 0)
+            }
+
+            solveFBL(name, j) {
+
+                const [Aname, Bname, Dname, L2name, L3name] = j.fbl.split(",")
+
+                this.solveJoint(Aname)
+                this.solveJoint(Bname)
+                this.solveJoint(Dname)
+
+                const A = this.context.joints[Aname]
+                const B = this.context.joints[Bname]
+                const D = this.context.joints[Dname]
+
+                const L2 = this.model.li[L2name].l
+                const L3 = this.model.li[L3name].l
+
+                this.context.joints[name] = this.fbl(A, D, B, L2, L3, -1)
+            }
+
+            // ---------- VISUALS ----------
+
+            buildVisuals() {
+
+                Object.keys(this.model.jo).forEach(name => {
+
+                    const mesh = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03),
+                        new THREE.MeshBasicMaterial({ color: 0xff4444 })
+                    )
+
+                    this.jointMeshes[name] = mesh
+                    this.root.add(mesh)
+
+                    const label = createLabel(name)
+                    label.position.set(0.05, 0.05, 0)
+
+                    mesh.add(label)
+
+
+                })
+
+                Object.values(this.model.li).forEach(link => {
+
+                    const geometry = new THREE.BoxGeometry(link.l, link.w, link.p)
+
+                    const mesh = new THREE.Mesh(
+                        geometry,
+                        new THREE.MeshNormalMaterial()
+                    )
+
+                    this.linkMeshes.push({ mesh, link })
+
+                    this.root.add(mesh)
+                })
+            }
+
+            updateVisuals() {
+
+                Object.entries(this.context.joints).forEach(([name, pos]) => {
+                    this.jointMeshes[name].position.copy(pos)
+                })
+
+                this.linkMeshes.forEach(obj => {
+
+                    const A = this.context.joints[obj.link.nodes[0]]
+                    const B = this.context.joints[obj.link.nodes[1]]
+
+                    if (!A || !B) return
+
+                    const mesh = obj.mesh
+
+                    const mid = new THREE.Vector3().addVectors(A, B).multiplyScalar(0.5)
+                    mesh.position.copy(mid)
+
+                    const dir = new THREE.Vector3().subVectors(B, A).normalize()
+
+                    const quat = new THREE.Quaternion()
+                    quat.setFromUnitVectors(
+                        new THREE.Vector3(1, 0, 0),
+                        dir
+                    )
+
+                    mesh.setRotationFromQuaternion(quat)
+                })
+                this.root.rotation.y =
+                    THREE.MathUtils.degToRad(this.context.var.alpha0)
+            }
+
+            // ---------- EXPRESSION ----------
+
+            evaluateExpression(expr) {
+
+                const context = this.context
+
+                expr = expr.replace(/@ang\((\w+),(\w+)\)/g, (m, a, b) => {
+
+                    const A = context.joints[a]
+                    const B = context.joints[b]
+
+                    return Math.atan2(
+                        B.y - A.y,
+                        B.x - A.x
+                    ) * 180 / Math.PI
+                })
+
+                expr = expr.replace(/@cte\.(\w+)/g, (m, name) => {
+                    return context.cte[name]
+                })
+
+                expr = expr.replace(/@var\.(\w+)/g, (m, name) => {
+                    return context.var[name]
+                })
+
+                return Function("return " + expr)()
+            }
+
+            fbl(A, D, B, L2, L3, elbow = 1) {
+
+                const AB = new THREE.Vector3().subVectors(B, A);
+                const BD = new THREE.Vector3().subVectors(D, B);
+
+                const d = BD.length();
+                const ex = BD.clone().normalize();
+
+                const a = (L2 * L2 - L3 * L3 + d * d) / (2 * d);
+
+                const h2 = L2 * L2 - a * a;
+                if (h2 < 0) return null;
+
+                const h = Math.sqrt(h2);
+
+                const P = B.clone().add(ex.clone().multiplyScalar(a));
+
+                const normal = new THREE.Vector3()
+                    .crossVectors(AB, BD)
+                    .normalize();
+
+                const ey = new THREE.Vector3()
+                    .crossVectors(normal, ex)
+                    .normalize();
+
+                return P.clone().add(ey.multiplyScalar(elbow * h));
+            }
+
+
+        }
+
+        const model = {
+            "cte": { "beta1": 180, "beta2": 90, "beta3": 90, "num_servos": 3, "PWM_min": 5, "PWM_max": 10, "alpha0_min": -90, "alpha1_min": 0, "alpha2_min": 90 },
+            "var": { "alpha0": 0, "alpha1": 90, "alpha2": 180 },
+            "li": {
+                "A": { "nodes": ["a", "b"], "l": 0.4, "w": 0.07, "p": 0.02 },
+                "B": { "nodes": ["a", "d"], "l": 0.8, "w": 0.07, "p": 0.02 },
+                "C": { "nodes": ["d", "c"], "l": 0.4, "w": 0.07, "p": 0.02 },
+                "D": { "nodes": ["c", "b"], "l": 0.8, "w": 0.07, "p": 0.02 },
+                "E": { "nodes": ["d", "f"], "l": 0.35, "w": 0.07, "p": 0.02 },
+                "F": { "nodes": ["f", "e"], "l": 0.8, "w": 0.07, "p": 0.02 },
+                "G": { "nodes": ["a", "e"], "l": 0.35, "w": 0.07, "p": 0.02 },
+                "H": { "nodes": ["c", "g"], "l": 0.45, "w": 0.07, "p": 0.02 },
+                "I": { "nodes": ["d", "g"], "l": 0.2, "w": 0.07, "p": 0.02 },
+                "J": { "nodes": ["d", "i"], "l": 0.8, "w": 0.07, "p": 0.02 },
+                "K": { "nodes": ["i", "h"], "l": 0.2, "w": 0.07, "p": 0.02 },
+                "L": { "nodes": ["g", "h"], "l": 0.8, "w": 0.07, "p": 0.02 },
+                "M": { "nodes": ["i", "j"], "l": 0.25, "w": 0.07, "p": 0.02 }
+            },
+            "jo": {
+                "a": { "transforms": [{ "parent": null }] },
+                "b": {
+                    "transforms": [
+                        { "parent": "a" },
+                        { "Rz": "@cte.beta1" },
+                        { "T": "@li.A" }]
+                },
+                "d": {
+                    "transform": [
+                        { "parent": "a" },
+                        { "Rz": "@var.alpha1" },
+                        { "T": "@li.B" }]
+                },
+                "c": { "fbl": "a,b,d,D,C" },
+                "e": {
+                    "transform": [
+                        { "parent": "a" },
+                        { "Rz": "@var.alpha2" },
+                        { "T": "@li.G" }]
+                },
+                "f": { "fbl": "a,d,e,E,F" },
+                "g": {
+                    "transform": [
+                        { "parent": "d" },
+                        { "Rz": "@ang(c,d) + @cte.beta2" },
+                        { "T": "@li.I" }]
+                },
+                "i": {
+                    "transform": [
+                        { "parent": "d" },
+                        { "Rz": "@ang(f,d)" },
+                        { "T": "@li.J" }]
+                },
+                "h": { "fbl": "d,g,i,L,K" },
+                "j": {
+                    "transform": [
+                        { "parent": "i" },
+                        { "Rz": "@ang(h,i) + @cte.beta3" },
+                        { "T": "@li.M" }]
+                }
+            },
+            "inv_kin": {
+                "i": "@var.final_point",
+                "alpha0,alpha1,alpha2": { "inv_kin_2links": "i" },
+                "gamma0": "alpha0",
+                "gamma1": "alpha1",
+                "a": { "transforms": [{ "parent": null }] },
+                "d": {
+                    "transform": [
+                        { "parent": "a" },
+                        { "Rz": "@var.alpha1" },
+                        { "T": "@li.B" }]
+                },
+                "f": {
+                    "transform": [
+                        { "parent": "d" },
+                        { "Rz": "@ang(i,d)" },
+                        { "T": "@li.E" }]
+                },
+                "e": { "fbl": "d,a,f,G,F" },
+                "gamma2": "@ang(a,e)"
+            }
+
+        }
+        // ================= SCENE =================
+
+        const scene = new THREE.Scene()
+        scene.updateMatrixWorld(true);
+
+        const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 100)
+        camera.position.set(0, 0, 4)
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true })
+        renderer.setSize(innerWidth, innerHeight)
+        document.body.appendChild(renderer.domElement)
+
+        scene.add(new THREE.AxesHelper(1))
+
+        const arm = new MeArm(scene, model)
+
+        //=============slides=================
+
+
+
+        const alpha0Slider = document.getElementById("pwm0")
+        const alpha1Slider = document.getElementById("pwm1")
+        const alpha2Slider = document.getElementById("pwm2")
+        const lab_a0Slider = document.getElementById("lab_pwm0")
+        const lab_a1Slider = document.getElementById("lab_pwm1")
+        const lab_a2Slider = document.getElementById("lab_pwm2")
+        const inv_kin = document.getElementById("inv_kin")
+        const inv_kin_2link = document.getElementById("inv_kin_2link")
+        const debug_div = document.getElementById("debug")
+
+        alpha0Slider.oninput = () => {
+            let alpha0 = parseFloat(alpha0Slider.value)
+            //context.var.alpha0 = alpha0
+            lab_a0Slider.innerText = "duty cycle: " + alpha0
+            //updateMechanism()
+            //console.log('arm',arm)
+            arm.setPWMs([alpha0, undefined, undefined])
+            update_angles()
+        }
+        alpha1Slider.oninput = () => {
+            let alpha1 = parseFloat(alpha1Slider.value)
+            //let alpha2 = parseFloat(alpha2Slider.value)
+            //if (Math.abs(alpha1-alpha2)<5){
+            //    alpha1=alpha2
+            //    alpha1Slider.value=alpha1
+            //}
+            //context.var.alpha1 = alpha1
+            lab_a1Slider.innerText = "duty cycle: " + alpha1
+            arm.setPWMs([undefined, alpha1, undefined])
+            //updateMechanism()
+            update_angles()
+        }
+
+        alpha2Slider.oninput = () => {
+            //let alpha1 = parseFloat(alpha1Slider.value)
+            let alpha2 = parseFloat(alpha2Slider.value)
+            //if (Math.abs(alpha1-alpha2)<5){
+            //    alpha1Slider.value=alpha2
+            //}
+            //context.var.alpha2 = alpha2
+            lab_a2Slider.innerText = "duty cycle: " + alpha2
+            arm.setPWMs([undefined, undefined, alpha2])
+            //updateMechanism()
+            update_angles()
+        }
+
+        // ================= LOOP =================
+
+        function animate() {
+            requestAnimationFrame(animate)
+            renderer.render(scene, camera)
+        }
+
+        // ================= INIT =================
+
+        //buildScene()
+        //updateMechanism()
+        animate()
+
+
+        // ================== HELPER FUNCTIONS ==========
+
+        function update_angles() {
+            const worldPos = new THREE.Vector3();
+            const i = new THREE.Vector3();
+            //console.log('i',arm.jointMeshes.i)
+            arm.jointMeshes.i.getWorldPosition(worldPos);
+            const gammas = mearm_inverseKinematics(worldPos)
+            //console.log('gammas',gammas)
+
+            inv_kin.innerText = "angles servos: "
+                + arm.context.var.alpha0
+                + ", " + arm.context.var.alpha1
+                + ", " + arm.context.var.alpha2
+                + "\n world pos: " + worldPos.x
+                + ", " + worldPos.y
+                + ", " + worldPos.z
+                + "\n inv_kin fbl " + gammas.gamma0 * 180 / Math.PI
+                + ", " + gammas.gamma1 * 180 / Math.PI
+                + ", " + gammas.gamma2 * 180 / Math.PI
+
+        }
+
+        function inv_kin_2links(P) {//Bug al cambiar de cuadrante
+            const a1 = 0
+            const a2 = model.li.B.l
+            const a3 = model.li.J.l
+            const x03 = P.x;
+            const z03 = P.y;
+            const y03 = -P.z;
+            const th1 = Math.atan2(y03, x03);
+            const r1 = Math.sqrt(x03 ** 2 + y03 ** 2);
+            const r2 = -(z03 - a1);
+            const phi2 = Math.atan2(r2, r1);
+            const r3 = Math.sqrt(r1 ** 2 + r2 ** 2);
+            const phi1 = Math.acos((a3 ** 2 - a2 ** 2 - r3 ** 2) / (-2 * a2 * r3));
+            const th2 = phi1 - phi2;
+            const phi3 = Math.acos((r3 ** 2 - a2 ** 2 - a3 ** 2) / (-2 * a2 * a3));
+            const th3 = phi3 - Math.PI / 2;
+            inv_kin_2link.innerText = "inv_kin_2link: "
+                + th1 * 180 / Math.PI
+                + ", " + th2 * 180 / Math.PI
+                + ", " + th3 * 180 / Math.PI
+            return [th1, th2, th3];
+        }
+
+        function mearm_inverseKinematics(finalPoint) {
+
+            // Step 1: analytic 2-link IK
+            const [alpha0, alpha1, alpha2] = inv_kin_2links(finalPoint)
+
+            // Step 2: arm angle mapping
+            const gamma0 = alpha0
+            const gamma1 = alpha1
+            // Step 3: base joint
+            const a = new THREE.Vector3(0, 0, 0)
+
+            // Step 4: compute joint d
+            const d = new THREE.Vector3(model.li.B.l, 0, 0)
+            d.applyAxisAngle(new THREE.Vector3(0, 0, 1), alpha1)
+            d.add(a)
+
+            // Step 5: direction from d to target
+            //const dir = new THREE.Vector3().subVectors(finalPoint, d)
+            //const angle_df = Math.atan2(dir.y, dir.x)
+
+            // Step 6: compute joint f
+            const f = new THREE.Vector3(model.li.E.l, 0, 0)
+            f.applyAxisAngle(new THREE.Vector3(0, 0, 1), alpha2+Math.PI)
+            f.add(d)
+
+            // Step 7: four-bar linkage
+            const e = fbl(d, a, f,  model.li.F.l,model.li.G.l,-1)
+
+            // Step 8: servo angle
+            const gamma2 = Math.atan2(e.y - a.y, e.x - a.x)
+            //console.log("dir", d,dir)
+            debug_div.innerText =
+                //"finalPoint:"+finalPoint.x+
+                "model.li.B: " + model.li.B.l +
+                " a: " + a.x + ", " + a.y + ", " + a.z +
+                " d: " + d.x + ", " + d.y + ", " + d.z +
+                //" dir: " + dir +
+                //" angle_df: " + angle_df*180/Math.PI +
+                " f: " + f.x + ", " + f.y + ", " + f.z + 
+                " e: " + e.x + ", " + e.y + ", " + e.z +
+                " gamma2: " + gamma2
+            return { gamma0, gamma1, gamma2 }
+        }
+        function fbl(A, D, B, L2, L3, elbow = 1) {
+
+            const AB = new THREE.Vector3().subVectors(B, A);
+            const BD = new THREE.Vector3().subVectors(D, B);
+
+            const d = BD.length();
+            const ex = BD.clone().normalize();
+
+            const a = (L2 * L2 - L3 * L3 + d * d) / (2 * d);
+
+            const h2 = L2 * L2 - a * a;
+            if (h2 < 0) return null;
+
+            const h = Math.sqrt(h2);
+
+            const P = B.clone().add(ex.clone().multiplyScalar(a));
+
+            const normal = new THREE.Vector3()
+                .crossVectors(AB, BD)
+                .normalize();
+
+            const ey = new THREE.Vector3()
+                .crossVectors(normal, ex)
+                .normalize();
+
+            return P.clone().add(ey.multiplyScalar(elbow * h));
+        }
+
+        function createLabel(text) {
+
+            const canvas = document.createElement("canvas")
+            const ctx = canvas.getContext("2d")
+
+            canvas.width = 256
+            canvas.height = 128
+
+            ctx.fillStyle = "black"
+            ctx.fillRect(0, 0, 256, 128)
+
+            ctx.fillStyle = "white"
+            ctx.font = "100px monospace"
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
+
+            ctx.fillText(text, 128, 64)
+
+            const texture = new THREE.CanvasTexture(canvas)
+
+            const material = new THREE.SpriteMaterial({ map: texture })
+
+            const sprite = new THREE.Sprite(material)
+
+            sprite.scale.set(0.15, 0.08, 1)
+
+            return sprite
+        }
+
+    </script>
+</body>
+
+</html>
