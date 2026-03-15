@@ -56,10 +56,12 @@
 
         class MeArm {
 
-            constructor(scene, model) {
+            constructor(scene, model,color_links= 0xff4444,color_joins= 0xff4444) {
 
                 this.scene = scene
                 this.model = model
+                this.color_links=color_links
+                this.color_joins=color_joins
                 //this.num_servos= model.cte.num_servos
                 this.PWM_min = model.cte.PWM_min
                 this.PWM_max = model.cte.PWM_max
@@ -195,7 +197,7 @@
 
                     const mesh = new THREE.Mesh(
                         new THREE.SphereGeometry(0.03),
-                        new THREE.MeshBasicMaterial({ color: 0xff4444 })
+                        new THREE.MeshBasicMaterial({ color: this.color_joins })
                     )
 
                     this.jointMeshes[name] = mesh
@@ -215,7 +217,8 @@
 
                     const mesh = new THREE.Mesh(
                         geometry,
-                        new THREE.MeshNormalMaterial()
+                        //new THREE.MeshNormalMaterial()
+                        new THREE.MeshBasicMaterial({ color: this.color_links })
                     )
 
                     this.linkMeshes.push({ mesh, link })
@@ -319,19 +322,19 @@
             "cte": { "beta1": 180, "beta2": 90, "beta3": 90, "num_servos": 3, "PWM_min": 5, "PWM_max": 10, "alpha0_min": -90, "alpha1_min": 0, "alpha2_min": 90 },
             "var": { "alpha0": 0, "alpha1": 90, "alpha2": 180 },
             "li": {
-                "A": { "nodes": ["a", "b"], "l": 0.4, "w": 0.07, "p": 0.02 },
-                "B": { "nodes": ["a", "d"], "l": 0.8, "w": 0.07, "p": 0.02 },
-                "C": { "nodes": ["d", "c"], "l": 0.4, "w": 0.07, "p": 0.02 },
-                "D": { "nodes": ["c", "b"], "l": 0.8, "w": 0.07, "p": 0.02 },
-                "E": { "nodes": ["d", "f"], "l": 0.35, "w": 0.07, "p": 0.02 },
-                "F": { "nodes": ["f", "e"], "l": 0.8, "w": 0.07, "p": 0.02 },
-                "G": { "nodes": ["a", "e"], "l": 0.35, "w": 0.07, "p": 0.02 },
-                "H": { "nodes": ["c", "g"], "l": 0.45, "w": 0.07, "p": 0.02 },
-                "I": { "nodes": ["d", "g"], "l": 0.2, "w": 0.07, "p": 0.02 },
-                "J": { "nodes": ["d", "i"], "l": 0.8, "w": 0.07, "p": 0.02 },
-                "K": { "nodes": ["i", "h"], "l": 0.2, "w": 0.07, "p": 0.02 },
-                "L": { "nodes": ["g", "h"], "l": 0.8, "w": 0.07, "p": 0.02 },
-                "M": { "nodes": ["i", "j"], "l": 0.25, "w": 0.07, "p": 0.02 }
+                "A": { "nodes": ["a", "b"], "l": 0.4, "w": 0.01, "p": 0.01 },
+                "B": { "nodes": ["a", "d"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                "C": { "nodes": ["d", "c"], "l": 0.4, "w": 0.01, "p": 0.01 },
+                "D": { "nodes": ["c", "b"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                "E": { "nodes": ["d", "f"], "l": 0.35, "w": 0.01, "p": 0.01 },
+                "F": { "nodes": ["f", "e"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                "G": { "nodes": ["a", "e"], "l": 0.35, "w": 0.01, "p": 0.01 },
+                "H": { "nodes": ["c", "g"], "l": 0.45, "w": 0.01, "p": 0.01 },
+                "I": { "nodes": ["d", "g"], "l": 0.2, "w": 0.01, "p": 0.01 },
+                "J": { "nodes": ["d", "i"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                "K": { "nodes": ["i", "h"], "l": 0.2, "w": 0.01, "p": 0.01 },
+                "L": { "nodes": ["g", "h"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                "M": { "nodes": ["i", "j"], "l": 0.25, "w": 0.01, "p": 0.01 }
             },
             "jo": {
                 "a": { "transforms": [{ "parent": null }] },
@@ -404,7 +407,7 @@
         scene.updateMatrixWorld(true);
 
         const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 100)
-        camera.position.set(0, 0, 4)
+        camera.position.set(0, 1.5, 5)
 
         const renderer = new THREE.WebGLRenderer({ antialias: true })
         renderer.setSize(innerWidth, innerHeight)
@@ -413,7 +416,8 @@
         scene.add(new THREE.AxesHelper(1))
 
         const arm = new MeArm(scene, model)
-
+        const arm2 = new MeArm(scene, model,color_links= 0x44ff44,color_joins= 0x44ff44)
+        arm2.root.position.set(0, 1.2, 0);
         //=============slides=================
 
 
@@ -486,22 +490,24 @@
             //console.log('i',arm.jointMeshes.i)
             arm.jointMeshes.i.getWorldPosition(worldPos);
             const gammas = mearm_inverseKinematics(worldPos)
+            arm2.setPWMs(gammas.gamma0,gammas.gamma2,gammas.gamma2)
             //console.log('gammas',gammas)
 
-            inv_kin.innerText = "angles servos: "
+            inv_kin.innerText = "\nangles servos: "
                 + arm.context.var.alpha0
                 + ", " + arm.context.var.alpha1
-                + ", " + arm.context.var.alpha2
-                + "\n world pos: " + worldPos.x
-                + ", " + worldPos.y
-                + ", " + worldPos.z
+                + ", " + ((arm.context.var.alpha2<180)?arm.context.var.alpha2:arm.context.var.alpha2-360)
                 + "\n inv_kin fbl " + gammas.gamma0 * 180 / Math.PI
                 + ", " + gammas.gamma1 * 180 / Math.PI
                 + ", " + gammas.gamma2 * 180 / Math.PI
+                + "\n\n world pos: " + worldPos.x
+                + ", " + worldPos.y
+                + ", " + worldPos.z
+
 
         }
 
-        function inv_kin_2links(P) {//Bug al cambiar de cuadrante
+        function inv_kin_2links(P) {//Bug P.y<0, z03<0 y si alpha1<alpha2
             const a1 = 0
             const a2 = model.li.B.l
             const a3 = model.li.J.l
