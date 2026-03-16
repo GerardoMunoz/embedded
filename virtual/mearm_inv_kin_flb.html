@@ -490,7 +490,7 @@
             //console.log('i',arm.jointMeshes.i)
             arm.jointMeshes.i.getWorldPosition(worldPos);
             const gammas = mearm_inverseKinematics(worldPos)
-            arm2.setPWMs(gammas.gamma0,gammas.gamma2,gammas.gamma2)
+            //arm2.setPWMs(gammas.gamma0,gammas.gamma2,gammas.gamma2)
             //console.log('gammas',gammas)
 
             inv_kin.innerText = "\nangles servos: "
