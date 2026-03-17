@@ -56,27 +56,27 @@
 
         class MeArm {
 
-            constructor(scene, model,color_links= 0xff4444,color_joins= 0xff4444) {
-
+            constructor(scene, model,tag=0,color_links= 0xff4444,color_joins= 0xff4444) {
+                this.tag=tag
                 this.scene = scene
-                this.model = model
+                this.model =  structuredClone(model)
                 this.color_links=color_links
                 this.color_joins=color_joins
                 //this.num_servos= model.cte.num_servos
                 this.PWM_min = model.cte.PWM_min
                 this.PWM_max = model.cte.PWM_max
-                this.alpha_min = []
+                this.alpha_min =  model.cte.alphas_min
                 this.numServos = Number(model.cte.num_servos);
 
                 //if (!Number.isInteger(this.numServos) || this.numServos < 0) {
                 //    throw new Error("num_servos must be a non-negative integer");
                 //}
 
-                for (let i = 0; i < this.numServos; i++) {
-                    this.alpha_min.push(model.cte["alpha" + i + "_min"])
-                }
+                //for (let i = 0; i < this.numServos; i++) {
+                //    this.alpha_min.push(model.cte["alpha" + i + "_min"])
+                //}
 
-                console.log('ini servos', this.PWM_min, this.PWM_max, this.numServos, this.alpha_min)
+                console.log('ini servos',this.tag, this.PWM_min, this.PWM_max, this.numServos, this.alpha_min)
 
 
 
@@ -100,11 +100,14 @@
             // ---------- PUBLIC API ----------
 
             setPWMs(PWMs) {
+                console.log('PWMsI',this.tag,PWMs)
                 for (let i = 0; i < PWMs.length; i++) {
                     if (PWMs[i] !== undefined && PWMs[i] !== null) {
                         this.context.var["alpha" + i] = (PWMs[i] - this.PWM_min) / (this.PWM_max - this.PWM_min) * 180 + this.alpha_min[i]
+                        console.log('PWMsA',this.tag,i, PWMs[i], this.PWM_min, this.PWM_max,  this.alpha_min[i])
                     }
                 }
+                console.log('PWMsO',this.tag)
                 this.update()
             }
 
@@ -318,8 +321,8 @@
 
         }
 
-        const model = {
-            "cte": { "beta1": 180, "beta2": 90, "beta3": 90, "num_servos": 3, "PWM_min": 5, "PWM_max": 10, "alpha0_min": -90, "alpha1_min": 0, "alpha2_min": 90 },
+        const model1 = {
+            "cte": { "beta1": 180, "beta2": 90, "beta3": 90, "num_servos": 3, "PWM_min": 5, "PWM_max": 10, "alphas_min": [-90,0,90] },
             "var": { "alpha0": 0, "alpha1": 90, "alpha2": 180 },
             "li": {
                 "A": { "nodes": ["a", "b"], "l": 0.4, "w": 0.01, "p": 0.01 },
@@ -415,8 +418,8 @@
 
         scene.add(new THREE.AxesHelper(1))
 
-        const arm = new MeArm(scene, model)
-        const arm2 = new MeArm(scene, model,color_links= 0x44ff44,color_joins= 0x44ff44)
+        const arm = new MeArm(scene, model1,tag=1)
+        const arm2 = new MeArm(scene, model1,tag=2,color_links= 0x44ff44,color_joins= 0x44ff44)
         arm2.root.position.set(0, 1.2, 0);
         //=============slides=================
 
@@ -437,8 +440,9 @@
             //context.var.alpha0 = alpha0
             lab_a0Slider.innerText = "duty cycle: " + alpha0
             //updateMechanism()
-            //console.log('arm',arm)
+            console.log('alpha0Slider',alpha0)
             arm.setPWMs([alpha0, undefined, undefined])
+            
             update_angles()
         }
         alpha1Slider.oninput = () => {
@@ -490,7 +494,14 @@
             //console.log('i',arm.jointMeshes.i)
             arm.jointMeshes.i.getWorldPosition(worldPos);
             const gammas = mearm_inverseKinematics(worldPos)
-            //arm2.setPWMs(gammas.gamma0,gammas.gamma2,gammas.gamma2)
+            console.log('pwms_gamma0',gammas,gammas["gamma"+0])
+            pwms_gamma=[]
+            for (let i = 0; i < 3; i++) {
+                pwms_gamma.push((gammas["gamma"+i]-model1.cte.angles_min[i])/Math.PI*( model.cte.PWM_max -model1.cte.PWM_min)+model1.cte.PWM_min)
+                console.log('pwms_gamma1',pwms_gamma[i])
+            }
+
+            arm2.setPWMs([gammas.gamma0/Math.PI*5+7.5,7.5,7.5])
             //console.log('gammas',gammas)
 
             inv_kin.innerText = "\nangles servos: "
@@ -509,12 +520,13 @@
 
         function inv_kin_2links(P) {//Bug P.y<0, z03<0 y si alpha1<alpha2
             const a1 = 0
-            const a2 = model.li.B.l
-            const a3 = model.li.J.l
+            const a2 = model1.li.B.l
+            const a3 = model1.li.J.l
             const x03 = P.x;
             const z03 = P.y;
             const y03 = -P.z;
             const th1 = Math.atan2(y03, x03);
+            console.log('th1',th1*180/Math.PI)
             const r1 = Math.sqrt(x03 ** 2 + y03 ** 2);
             const r2 = -(z03 - a1);
             const phi2 = Math.atan2(r2, r1);
@@ -542,7 +554,7 @@
             const a = new THREE.Vector3(0, 0, 0)
 
             // Step 4: compute joint d
-            const d = new THREE.Vector3(model.li.B.l, 0, 0)
+            const d = new THREE.Vector3(model1.li.B.l, 0, 0)
             d.applyAxisAngle(new THREE.Vector3(0, 0, 1), alpha1)
             d.add(a)
 
@@ -551,19 +563,19 @@
             //const angle_df = Math.atan2(dir.y, dir.x)
 
             // Step 6: compute joint f
-            const f = new THREE.Vector3(model.li.E.l, 0, 0)
+            const f = new THREE.Vector3(model1.li.E.l, 0, 0)
             f.applyAxisAngle(new THREE.Vector3(0, 0, 1), alpha2+Math.PI)
             f.add(d)
 
             // Step 7: four-bar linkage
-            const e = fbl(d, a, f,  model.li.F.l,model.li.G.l,-1)
+            const e = fbl(d, a, f,  model1.li.F.l,model1.li.G.l,-1)
 
             // Step 8: servo angle
             const gamma2 = Math.atan2(e.y - a.y, e.x - a.x)
             //console.log("dir", d,dir)
             debug_div.innerText =
                 //"finalPoint:"+finalPoint.x+
-                "model.li.B: " + model.li.B.l +
+                "model.li.B: " + model1.li.B.l +
                 " a: " + a.x + ", " + a.y + ", " + a.z +
                 " d: " + d.x + ", " + d.y + ", " + d.z +
                 //" dir: " + dir +
