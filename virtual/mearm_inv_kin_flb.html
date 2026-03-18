@@ -494,14 +494,14 @@
             //console.log('i',arm.jointMeshes.i)
             arm.jointMeshes.i.getWorldPosition(worldPos);
             const gammas = mearm_inverseKinematics(worldPos)
-            console.log('pwms_gamma0',gammas,gammas["gamma"+0])
+            console.log('pwms_gamma0',gammas,gammas["gamma"+0],model1.cte.alphas_min)
             pwms_gamma=[]
             for (let i = 0; i < 3; i++) {
-                pwms_gamma.push((gammas["gamma"+i]-model1.cte.angles_min[i])/Math.PI*( model.cte.PWM_max -model1.cte.PWM_min)+model1.cte.PWM_min)
+                pwms_gamma.push((gammas["gamma"+i]-model1.cte.alphas_min[i])/Math.PI*( model1.cte.PWM_max -model1.cte.PWM_min)+model1.cte.PWM_min)
                 console.log('pwms_gamma1',pwms_gamma[i])
             }
 
-            arm2.setPWMs([gammas.gamma0/Math.PI*5+7.5,7.5,7.5])
+            arm2.setPWMs(pwms_gamma);//[gammas.gamma0/Math.PI*5+7.5,7.5,7.5])
             //console.log('gammas',gammas)
 
             inv_kin.innerText = "\nangles servos: "
