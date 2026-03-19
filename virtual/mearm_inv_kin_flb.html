@@ -33,13 +33,13 @@
 <body>
 
     <div id="panel">
-        <label>alpha0 <input id="pwm0" type="range" min="5" max="10" value="7.5" step="0.1">
+        <label>alpha0 <input id="pwm0" type="range" min="-180" max="180" value="0" step="5">
             <div id="lab_pwm0"></div>
         </label>
-        <label>alpha1 <input id="pwm1" type="range" min="5" max="10" value="7.5" step="0.1">
+        <label>alpha1 <input id="pwm1" type="range" min="-180" max="180" value="90" step="5">
             <div id="lab_pwm1"></div>
         </label>
-        <label>alpha2 <input id="pwm2" type="range" min="5" max="10" value="7.5" step="0.1">
+        <label>alpha2 <input id="pwm2" type="range" min="-180" max="180" value="-180" step="5">
             <div id="lab_pwm2"></div>
         </label>
         <div id="inv_kin"></div>
@@ -99,15 +99,26 @@
 
             // ---------- PUBLIC API ----------
 
-            setPWMs(PWMs) {
-                console.log('PWMsI',this.tag,PWMs)
-                for (let i = 0; i < PWMs.length; i++) {
-                    if (PWMs[i] !== undefined && PWMs[i] !== null) {
-                        this.context.var["alpha" + i] = (PWMs[i] - this.PWM_min) / (this.PWM_max - this.PWM_min) * 180 + this.alpha_min[i]
-                        console.log('PWMsA',this.tag,i, PWMs[i], this.PWM_min, this.PWM_max,  this.alpha_min[i])
+            // setPWMs(PWMs) {
+            //     console.log('PWMsI',this.tag,PWMs)
+            //     for (let i = 0; i < PWMs.length; i++) {
+            //         if (PWMs[i] !== undefined && PWMs[i] !== null) {
+            //             this.context.var["alpha" + i] = (PWMs[i] - this.PWM_min) / (this.PWM_max - this.PWM_min) * 180 + this.alpha_min[i]
+            //             console.log('PWMsA',this.tag,i, PWMs[i], this.PWM_min, this.PWM_max,  this.alpha_min[i])
+            //         }
+            //     }
+            //     console.log('PWMsO',this.tag)
+            //     this.update()
+            // }
+            setAngles_deg(angles) {
+                console.log('anglesI',this.tag,angles)
+                for (let i = 0; i < angles.length; i++) {
+                    if (angles[i] !== undefined && angles[i] !== null) {
+                        this.context.var["alpha" + i] = angles[i]
+                        console.log('anglesO',this.tag,i, angles[i])
                     }
                 }
-                console.log('PWMsO',this.tag)
+                //console.log('PWMsO',this.tag)
                 this.update()
             }
 
@@ -322,7 +333,7 @@
         }
 
         const model1 = {
-            "cte": { "beta1": 180, "beta2": 90, "beta3": 90, "num_servos": 3, "PWM_min": 5, "PWM_max": 10, "alphas_min": [-90,0,90] },
+            "cte": { "beta1": 180, "beta2": 90, "beta3": 90},//, "num_servos": 3, "PWM_min": 5, "PWM_max": 10, "alphas_min": [-90,0,90] },
             "var": { "alpha0": 0, "alpha1": 90, "alpha2": 180 },
             "li": {
                 "A": { "nodes": ["a", "b"], "l": 0.4, "w": 0.01, "p": 0.01 },
@@ -410,7 +421,7 @@
         scene.updateMatrixWorld(true);
 
         const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 100)
-        camera.position.set(0, 1.5, 5)
+        camera.position.set(0, 2, 5)
 
         const renderer = new THREE.WebGLRenderer({ antialias: true })
         renderer.setSize(innerWidth, innerHeight)
@@ -441,7 +452,7 @@
             lab_a0Slider.innerText = "duty cycle: " + alpha0
             //updateMechanism()
             console.log('alpha0Slider',alpha0)
-            arm.setPWMs([alpha0, undefined, undefined])
+            arm.setAngles_deg([alpha0, undefined, undefined])
             
             update_angles()
         }
@@ -454,7 +465,7 @@
             //}
             //context.var.alpha1 = alpha1
             lab_a1Slider.innerText = "duty cycle: " + alpha1
-            arm.setPWMs([undefined, alpha1, undefined])
+            arm.setAngles_deg([undefined, alpha1, undefined])
             //updateMechanism()
             update_angles()
         }
@@ -467,7 +478,7 @@
             //}
             //context.var.alpha2 = alpha2
             lab_a2Slider.innerText = "duty cycle: " + alpha2
-            arm.setPWMs([undefined, undefined, alpha2])
+            arm.setAngles_deg([undefined, undefined, alpha2])
             //updateMechanism()
             update_angles()
         }
@@ -494,20 +505,23 @@
             //console.log('i',arm.jointMeshes.i)
             arm.jointMeshes.i.getWorldPosition(worldPos);
             const gammas = mearm_inverseKinematics(worldPos)
-            console.log('pwms_gamma0',gammas,gammas["gamma"+0],model1.cte.alphas_min)
-            pwms_gamma=[]
-            for (let i = 0; i < 3; i++) {
-                pwms_gamma.push((gammas["gamma"+i]-model1.cte.alphas_min[i])/Math.PI*( model1.cte.PWM_max -model1.cte.PWM_min)+model1.cte.PWM_min)
-                console.log('pwms_gamma1',pwms_gamma[i])
-            }
+            console.log('pwms_gamma0',gammas,gammas["gamma"+0])
+            //pwms_gamma=[]
+            // for (let i = 0; i < 3; i++) {
+            //     pwms_gamma.push((gammas["gamma"+i]-model1.cte.angles_min[i])/Math.PI*( model.cte.PWM_max -model1.cte.PWM_min)+model1.cte.PWM_min)
+            //     console.log('pwms_gamma1',pwms_gamma[i])
+            // }
 
-            arm2.setPWMs(pwms_gamma);//[gammas.gamma0/Math.PI*5+7.5,7.5,7.5])
+//            arm2.setAngles_deg([gammas.gamma0/Math.PI*5+7.5,7.5,7.5])
+//            arm2.setAngles_deg([0,90,180])
+            arm2.setAngles_deg(gammas)
             //console.log('gammas',gammas)
 
             inv_kin.innerText = "\nangles servos: "
                 + arm.context.var.alpha0
                 + ", " + arm.context.var.alpha1
-                + ", " + ((arm.context.var.alpha2<180)?arm.context.var.alpha2:arm.context.var.alpha2-360)
+                //+ ", " + ((arm.context.var.alpha2<180)?arm.context.var.alpha2:arm.context.var.alpha2-360)
+                + ", " + arm.context.var.alpha2
                 + "\n inv_kin fbl " + gammas.gamma0 * 180 / Math.PI
                 + ", " + gammas.gamma1 * 180 / Math.PI
                 + ", " + gammas.gamma2 * 180 / Math.PI
