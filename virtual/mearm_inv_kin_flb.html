@@ -557,7 +557,7 @@
             const phi1 = Math.acos((a3 ** 2 - a2 ** 2 - r3 ** 2) / (-2 * a2 * r3));
             const th2 = phi1 - phi2;
             const phi3 = Math.acos((r3 ** 2 - a2 ** 2 - a3 ** 2) / (-2 * a2 * a3));
-            const th3 = phi3 - Math.PI / 2;
+            const th3 = phi3 + th2 - Math.PI ;
             inv_kin_2link.innerText = "inv_kin_2link: "
                 + th1 * 180 / Math.PI
                 + ", " + th2 * 180 / Math.PI
