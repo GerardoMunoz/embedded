@@ -152,6 +152,8 @@
         //YA actualizar medidas MeArm
         //Debug Seq
         // Controlarlo para que siga Bezier en un tiempo dado
+        // bezier 2
+        // rombos
         // Simular los Servos
         //Simular la RPi Pico
 
@@ -284,6 +286,15 @@
                                     "P0_dm": [0.5, 0, 0],
                                     "P1_dm": [0.5, 0.3, 0.3],
                                     "P2_dm": [0.5, 0.3, -0.3],
+                                    "P3_dm": [0.5, 0, 0]
+                                },
+                                "duration_s": 5
+                            },
+                            {
+                                "bezier4": {
+                                    "P0_dm": [0.5, 0, 0],
+                                    "P1_dm": [0.5, 0.6, 0.6],
+                                    "P2_dm": [0.5, 0.6, -0.6],
                                     "P3_dm": [0.5, 0, 0]
                                 },
                                 "duration_s": 5
@@ -662,6 +673,7 @@
                     const point=this.state.seq.getPointAtTime(Date.now())
                     console.log('update point', point)
                     if ( point==undefined){
+
                         this.state.action="wait"
                         delete this.state.seq
                     }
@@ -744,13 +756,18 @@
                 this.ts=ts
                 //this.actual=this.data.shift()
                 //console.log('Sequence',this.actual)
-                this.read_data()
+                this.read_data(ts)
             }
 
-            read_data(){
+            read_data(ts){
                 this.actual=this.data.shift()
+                this.ts=ts
+                if (this.actual==undefined){
+                    return undefined
+                }
                 if ("bezier4" in this.actual){
                     this.actual_obj=new Bezier4(this.actual,this.ts)
+                    return this.actual_obj
                 } 
                 else
                 {
@@ -769,7 +786,20 @@
             // }
 
             getPointAtTime(ts) {
-                return this.actual_obj.getPointAtTime(ts)
+                const point=this.actual_obj.getPointAtTime(ts)
+                console.log('seq getP 0',point)
+                if (point==undefined){
+                    const obj=this.read_data(ts)
+                    console.log('seq getP 1',obj,this.actual_obj)
+                    if (obj==undefined){
+                        return undefined
+                    }
+                    const point=this.actual_obj.getPointAtTime(ts)
+                    console.log('seq getP 2',point)
+                    return point
+                }
+                return point
+                
                 // let t = (time_s-this.time_ini) / this.actual.duration;
                 // //t = Math.min(Math.max(t, 0), 1);
                 // return this.getPoint(t);
