@@ -299,6 +299,36 @@
                                 },
                                 "duration_s": 5
                             }
+                        ],
+                        "rhomb5": [
+                            {
+                                "bezier2": {
+                                    "P0_dm": [0.5, 0, 0],
+                                    "P1_dm": [0.5, 0.35, 0.35]
+                                },
+                                "duration_s": 1
+                            },
+                            {
+                                "bezier2": {
+                                    "P0_dm": [0.5, 0.35, 0.35],
+                                    "P1_dm": [0.5, 0.7, 0]
+                                },
+                                "duration_s": 1
+                            },
+                            {
+                                "bezier2": {
+                                    "P0_dm": [0.5, 0.7, 0],
+                                    "P1_dm": [0.5, 0.35, -0.35]
+                                },
+                                "duration_s": 1
+                            },
+                            {
+                                "bezier2": {
+                                    "P0_dm": [0.5, 0.35, -0.35],
+                                    "P1_dm": [0.5, 0, 0]
+                                },
+                                "duration_s": 1
+                            }
                         ]
                     }
                 }
@@ -372,7 +402,7 @@
                 {
                     const dir = rotZ(ctes.betas[0]);
                     pts.b = new THREE.Vector3().copy(pts.a).addScaledVector(dir, this.model.li.A.l);
-                    console.log('b', dir, this.model.li.A.l, pts.a, pts.b)
+                    //console.log('b', dir, this.model.li.A.l, pts.a, pts.b)
                 }
 
 
@@ -586,7 +616,7 @@
                 const z03 = P.y;
                 const y03 = -P.z;
                 const th1 = Math.atan2(y03, x03);
-                console.log('th1', th1 * 180 / Math.PI)
+                //console.log('th1', th1 * 180 / Math.PI)
                 const r1 = Math.sqrt(x03 ** 2 + y03 ** 2);
                 const r2 = -(z03 - a1);
                 const phi2 = Math.atan2(r2, r1);
@@ -608,7 +638,7 @@
                     //console.log('i',arm.jointMeshes.i)
                     this.jointMeshes.i.getWorldPosition(finalPoint);
                 }
-                console.log('i', finalPoint)
+                //console.log('i', finalPoint)
                 // Step 1: analytic 2-link IK
                 const [alpha0, alpha1, alpha2] = this.inv_kin_2links_rad(finalPoint)
 
@@ -669,9 +699,9 @@
 
             update() {
                 if (this.state.action=="seq"){
-                    console.log('upfate seq',Date.now(),this.state)
+                    //console.log('upfate seq',Date.now(),this.state)
                     const point=this.state.seq.getPointAtTime(Date.now())
-                    console.log('update point', point)
+                    //console.log('update point', point)
                     if ( point==undefined){
 
                         this.state.action="wait"
@@ -679,7 +709,7 @@
                     }
                     else{
                         const angles = this.robot.inverseKinematics_deg(point);
-                        console.log('update seqgo', point, angles)
+                        //console.log('update seqgo', point, angles)
                         if (angles) {
                             this.robot.setAngles_deg(angles);
                         }
@@ -719,7 +749,7 @@
                         );
 
                         const angles = this.robot.inverseKinematics_deg(target);
-                        console.log('go', target, angles)
+                        //console.log('go', target, angles)
                         if (angles) {
                             this.robot.setAngles_deg(angles);
                         }
@@ -730,7 +760,7 @@
                     case "seq":
                         // use JSON textarea
                         const seq = new  Sequence(this.robot.model.sequences[parts[1]],Date.now());
-                        console.log('revisar',seq)
+                       //console.log('revisar',seq)
                         this.state.action = "seq"
                         this.state.seq=seq//new Sequence(data,Date.now())
                         // if (data) {
@@ -750,9 +780,9 @@
 //seq diamond
         class Sequence{
             constructor(data,ts){
-                console.log('seqseq',data)
+                //console.log('seqseq',data)
                 //this.data=[...data].reverse()
-                this.data=data
+                this.data=structuredClone(data)
                 this.ts=ts
                 //this.actual=this.data.shift()
                 //console.log('Sequence',this.actual)
@@ -761,6 +791,7 @@
 
             read_data(ts){
                 this.actual=this.data.shift()
+                console.log('read_data',this.actual)
                 this.ts=ts
                 if (this.actual==undefined){
                     return undefined
@@ -769,10 +800,14 @@
                     this.actual_obj=new Bezier4(this.actual,this.ts)
                     return this.actual_obj
                 } 
+                else if ("bezier2" in this.actual){
+                    this.actual_obj=new Bezier2(this.actual,this.ts)
+                    return this.actual_obj
+                } 
                 else
                 {
                     logDebug("Unknown command: " + this.actual);
-                    console.log('seq '+"Unknown command: " + this.actual)
+                    //console.log('seq '+"Unknown command: " + this.actual)
                 }
 
             }
@@ -787,15 +822,15 @@
 
             getPointAtTime(ts) {
                 const point=this.actual_obj.getPointAtTime(ts)
-                console.log('seq getP 0',point)
+                //console.log('seq getP 0',point)
                 if (point==undefined){
                     const obj=this.read_data(ts)
-                    console.log('seq getP 1',obj,this.actual_obj)
+                    //console.log('seq getP 1',obj,this.actual_obj)
                     if (obj==undefined){
                         return undefined
                     }
                     const point=this.actual_obj.getPointAtTime(ts)
-                    console.log('seq getP 2',point)
+                    //console.log('seq getP 2',point)
                     return point
                 }
                 return point
@@ -810,7 +845,7 @@
 
         class Bezier4 {
             constructor(data,time_ini) {
-                console.log('Bezier4',data)
+                //console.log('Bezier4',data)
                 this.P0 = new THREE.Vector3(...data.bezier4.P0_dm);
                 this.P1 = new THREE.Vector3(...data.bezier4.P1_dm);
                 this.P2 = new THREE.Vector3(...data.bezier4.P2_dm);
@@ -820,7 +855,7 @@
             }
 
             getPoint(t) {
-                console.log('Bezier4 t',t,this.P0,this.P1,this.P2,this.P3)
+                //console.log('Bezier4 t',t,this.P0,this.P1,this.P2,this.P3)
                 if (t<0 || t>1){
                     return undefined
                 }
@@ -830,12 +865,41 @@
                     .addScaledVector(this.P1, 3 * u * u * t)
                     .addScaledVector(this.P2, 3 * u * t * t)
                     .addScaledVector(this.P3, t * t * t);
-                console.log('Bezier4 vec',vec,u,t)
+                //console.log('Bezier4 vec',vec,u,t)
                 return vec
             }
 
             getPointAtTime(time_s) {
-                console.log('Bezier4b t',time_s,this.time_ini,this.duration_s)
+                //console.log('Bezier4b t',time_s,this.time_ini,this.duration_s)
+                let t = (time_s-this.time_ini) / this.duration_s/1000;
+                //t = Math.min(Math.max(t, 0), 1);
+                return this.getPoint(t);
+            }
+        }
+        class Bezier2 {
+            constructor(data,time_ini) {
+                //console.log('Bezier4',data)
+                this.P0 = new THREE.Vector3(...data.bezier2.P0_dm);
+                this.P1 = new THREE.Vector3(...data.bezier2.P1_dm);
+                this.duration_s = data.duration_s;
+                this.time_ini = time_ini;
+            }
+
+            getPoint(t) {
+                //console.log('Bezier4 t',t,this.P0,this.P1,this.P2,this.P3)
+                if (t<0 || t>1){
+                    return undefined
+                }
+                const u = 1 - t;
+                const vec= new THREE.Vector3()
+                    .addScaledVector(this.P0,  u)
+                    .addScaledVector(this.P1,  t)
+                //console.log('Bezier4 vec',vec,u,t)
+                return vec
+            }
+
+            getPointAtTime(time_s) {
+                //console.log('Bezier4b t',time_s,this.time_ini,this.duration_s)
                 let t = (time_s-this.time_ini) / this.duration_s/1000;
                 //t = Math.min(Math.max(t, 0), 1);
                 return this.getPoint(t);
@@ -896,7 +960,7 @@
             }
 
             update() {
-                console.log('App.update', this.robot)
+                //console.log('App.update', this.robot)
                 this.robot2.setAngles_deg(this.robot.inverseKinematics_deg())
             }
         }
