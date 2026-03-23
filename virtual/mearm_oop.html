@@ -293,8 +293,18 @@
             }
 
             update_model() {
-                this.textarea = document.getElementById("modelInput")
-                this.model = JSON.parse(this.textarea.value)
+                //this.textarea = document.getElementById("modelInput")
+                //this.model = JSON.parse(this.textarea.value)
+                //function getModelFromUI() {
+            const txt = document.getElementById("modelInput").value;
+            try {
+                this.model = JSON.parse(txt);
+                this.update()
+            } catch (e) {
+                logDebug("JSON error: " + e.message);
+                
+            }
+        //}
                 this.update()
             }
 
@@ -623,6 +633,8 @@
             constructor(robot) {//, kinematics
                 this.robot = robot;
                 //this.kinematics = kinematics;
+logDebug('To update the model, use the command "update_model"')
+
             }
 
             setManualAngles(angles) {
@@ -781,15 +793,7 @@
             debug.innerText = text + "\n" + debug.innerText;
         }
 
-        function getModelFromUI() {
-            const txt = document.getElementById("modelInput").value;
-            try {
-                return JSON.parse(txt);
-            } catch (e) {
-                logDebug("JSON error: " + e.message);
-                return null;
-            }
-        }
+        
 
 
     </script>
