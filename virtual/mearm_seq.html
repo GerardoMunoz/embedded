@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mechanism Viewer</title>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            color: white;
+            font-family: monospace
+        }
+
+        #panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #222;
+            padding: 10px;
+            border-radius: 6px
+        }
+
+        label {
+            display: block;
+            margin-top: 6px
+        }
+
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: monospace;
+            background: #111;
+            color: white;
+        }
+
+        #container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Desktop → side by side */
+        @media (min-aspect-ratio: 1/1) {
+            #container {
+                flex-direction: row;
+            }
+        }
+
+        /* Mobile → stacked */
+        @media (max-aspect-ratio: 1/1) {
+            #container {
+                flex-direction: column;
+            }
+        }
+
+        #viewer {
+            flex: 2;
+            background: black;
+        }
+
+        #sidepanel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #222;
+        }
+
+        #modelInput {
+            flex: 1;
+            background: #111;
+            color: #0f0;
+            border: none;
+            padding: 10px;
+            resize: none;
+        }
+
+        #debug {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            border-top: 1px solid #444;
+        }
+
+        #console {
+            display: flex;
+            border-top: 1px solid #444;
+        }
+
+        #cmdInput {
+            flex: 1;
+            padding: 10px;
+            background: black;
+            color: #0f0;
+            border: none;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div id="container">
+
+        <div id="viewer"></div>
+
+        <div id="sidepanel">
+            <textarea id="modelInput">
+{
+  "example": "paste your model or trajectory here"
+}
+        </textarea>
+            <div id="console">
+                <input id="cmdInput" placeholder="Type command..." />
+                <button onclick="sendCommand()">Send</button>
+            </div>
+
+            <div id="debug">
+
+            </div>
+
+        </div>
+
+    </div>
+    <div id="panel">
+        <label>alpha0 <input id="slider0" type="range" min="-180" max="180" value="0" step="5">
+            <div id="lab_slider0"></div>
+        </label>
+        <label>alpha1 <input id="slider1" type="range" min="-180" max="180" value="90" step="5">
+            <div id="lab_slider1"></div>
+        </label>
+        <label>alpha2 <input id="slider2" type="range" min="-180" max="180" value="-180" step="5">
+            <div id="lab_slider2"></div>
+        </label>
+        <div id="inv_kin"></div>
+        <div id="inv_kin_2link"></div>
+        <div id="debug2"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    <script>
+
+        //To Do
+        //YA Dibujar MeArm a partir del JSON de las medidas 
+        //YA Poder mover el MeArm con los deslizadores
+        //YA Verificar la cinemática inversa
+        //YA usar comandos
+        //YA actualizar medidas MeArm
+        //Debug Seq
+        // Controlarlo para que siga Bezier en un tiempo dado
+        // Simular los Servos
+        //Simular la RPi Pico
+
+
+        // UI
+        const input = document.getElementById("cmdInput");
+
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                sendCommand();
+            }
+        });
+        function sendCommand() {
+            const input = document.getElementById("cmdInput");
+            const cmd = input.value.trim();
+
+            if (!cmd) return;
+
+            app.controller.executeCommand(cmd);
+
+            logDebug("> " + cmd);
+
+            input.value = "";
+        }
+
+
+        class Viewer {
+            constructor() {
+                this.container = document.getElementById("viewer");
+
+                this.scene = new THREE.Scene();
+
+                this.camera = new THREE.PerspectiveCamera(
+                    60,
+                    this.container.clientWidth / this.container.clientHeight,
+                    0.01,
+                    100
+                );
+
+                this.camera.position.set(2, 2, 4);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(
+                    this.container.clientWidth,
+                    this.container.clientHeight
+                );
+
+                this.container.appendChild(this.renderer.domElement);
+
+                // ✅ OrbitControls
+                this.controls = new THREE.OrbitControls(
+                    this.camera,
+                    this.renderer.domElement
+                );
+
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+
+                // Touch friendly
+                this.controls.enablePan = true;
+                this.controls.enableZoom = true;
+
+                this.scene.add(new THREE.AxesHelper(1));
+
+                // Handle resize
+                window.addEventListener("resize", this.onResize);
+            }
+
+            onResize = () => {
+                const w = this.container.clientWidth;
+                const h = this.container.clientHeight;
+
+                this.camera.aspect = w / h;
+                this.camera.updateProjectionMatrix();
+
+                this.renderer.setSize(w, h);
+            };
+
+            render() {
+                this.controls.update(); // IMPORTANT for damping
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            setBezierCurve(P0, P1, P2, P3) {
+
+                if (this.curveLine) {
+                    this.scene.remove(this.curveLine);
+                }
+
+                this.curveLine = createBezierCurve(P0, P1, P2, P3);
+                this.scene.add(this.curveLine);
+            }
+        }
+
+        class MeArm {
+            constructor(scene) {
+                this.scene = scene;
+
+                // this.mesh = new THREE.Mesh(
+                //     new THREE.BoxGeometry(0.5, 0.1, 0.1),
+                //     new THREE.MeshBasicMaterial({ color: 0xff4444 })
+                // );
+
+                // this.scene.add(this.mesh);
+
+
+
+                this.model = {
+                    "cte": { "betas": [180, 90, 90] },
+                    "initial_angles": [0, 90, 180],
+                    "li": {
+                        "A": { "nodes": ["a", "b"], "l": 0.4, "w": 0.01, "p": 0.01 },
+                        "B": { "nodes": ["a", "d"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                        "C": { "nodes": ["d", "c"], "l": 0.4, "w": 0.01, "p": 0.01 },
+                        "D": { "nodes": ["c", "b"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                        "E": { "nodes": ["d", "f"], "l": 0.35, "w": 0.01, "p": 0.01 },
+                        "F": { "nodes": ["f", "e"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                        "G": { "nodes": ["a", "e"], "l": 0.35, "w": 0.01, "p": 0.01 },
+                        "H": { "nodes": ["c", "g"], "l": 0.45, "w": 0.01, "p": 0.01 },
+                        "I": { "nodes": ["d", "g"], "l": 0.2, "w": 0.01, "p": 0.01 },
+                        "J": { "nodes": ["d", "i"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                        "K": { "nodes": ["i", "h"], "l": 0.2, "w": 0.01, "p": 0.01 },
+                        "L": { "nodes": ["g", "h"], "l": 0.8, "w": 0.01, "p": 0.01 },
+                        "M": { "nodes": ["i", "j"], "l": 0.25, "w": 0.01, "p": 0.01 }
+                    },
+                    "sequences": {
+                        "diamond": [
+                            {
+                                "bezier4": {
+                                    "P0_dm": [0.5, 0, 0],
+                                    "P1_dm": [0.5, 0.3, 0.3],
+                                    "P2_dm": [0.5, 0.3, -0.3],
+                                    "P3_dm": [0.5, 0, 0]
+                                },
+                                "duration_s": 5
+                            }
+                        ]
+                    }
+                }
+
+                this.angles = structuredClone(this.model.initial_angles)
+                this.joints = this.computePoints_deg(this.model, this.angles)
+                console.log('joints', this.joints)
+
+                this.jointMeshes = {}
+                this.linkMeshes = []
+
+                this.root = new THREE.Group()
+                this.scene.add(this.root)
+
+                this.buildVisuals()
+                this.update()
+            }
+
+            update_model() {
+                //this.textarea = document.getElementById("modelInput")
+                //this.model = JSON.parse(this.textarea.value)
+                //function getModelFromUI() {
+                const txt = document.getElementById("modelInput").value;
+                try {
+                    this.model = JSON.parse(txt);
+                    this.update()
+                } catch (e) {
+                    logDebug("JSON error: " + e.message);
+
+                }
+                //}
+                this.update()
+            }
+
+            setAngles_deg(angles) {
+                for (let i = 0; i < 3; i++) {
+                    if (angles[i] !== undefined) {
+                        this.angles[i] = angles[i];
+                    }
+                }
+
+                // simple visualization
+                //this.mesh.rotation.z = THREE.MathUtils.degToRad(this.angles[0]);
+                this.update()
+            }
+
+            computePoints_deg(model, angles) {
+                const alphas = []
+                const ctes = { "betas": [] }
+                alphas[0] = angles[0] * Math.PI / 180
+                alphas[1] = angles[1] * Math.PI / 180
+                alphas[2] = angles[2] * Math.PI / 180
+                ctes.betas[0] = model.cte.betas[0] * Math.PI / 180
+                ctes.betas[1] = model.cte.betas[1] * Math.PI / 180
+                ctes.betas[2] = model.cte.betas[2] * Math.PI / 180
+                //const alphas = alphas_deg.map(deg => deg * Math.PI / 180);
+                const pts = {};
+
+                // --- helpers ---
+                const rotZ = (angle) => new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+
+                const angleBetween = (p1, p2) => {
+                    const v = new THREE.Vector3().subVectors(p1, p2);
+                    return Math.atan2(v.y, v.x);
+                };
+
+                // --- base point ---
+                pts.a = new THREE.Vector3(0, 0, 0);
+
+                // --- b ---
+                {
+                    const dir = rotZ(ctes.betas[0]);
+                    pts.b = new THREE.Vector3().copy(pts.a).addScaledVector(dir, this.model.li.A.l);
+                    console.log('b', dir, this.model.li.A.l, pts.a, pts.b)
+                }
+
+
+                // --- d ---
+                {
+                    const dir = rotZ(alphas[1]);
+                    pts.d = new THREE.Vector3().copy(pts.a).addScaledVector(dir, this.model.li.B.l);
+                }
+
+                // --- c (free body link: intersection-like construction) ---
+                {
+                    // Approximation: midpoint + perpendicular offset (depends on D, C lengths)
+                    //const mid = new THREE.Vector3().addVectors(pts.b, pts.d).multiplyScalar(0.5);
+                    //const dir = new THREE.Vector3().subVectors(pts.d, pts.b).normalize();
+                    //const perp = new THREE.Vector3(-dir.y, dir.x, 0);
+
+                    //pts.c = new THREE.Vector3().copy(mid).addScaledVector(perp, this.model.li.C.l);
+
+                    pts.c = this.fbl(pts.a, pts.b, pts.d, this.model.li.C.l, this.model.li.D.l, -1)
+                }
+
+                // --- e ---
+                {
+                    const dir = rotZ(alphas[2]);
+                    pts.e = new THREE.Vector3().copy(pts.a).addScaledVector(dir, this.model.li.G.l);
+                }
+
+                // --- f ---
+                {
+                    // const mid = new THREE.Vector3().addVectors(pts.d, pts.e).multiplyScalar(0.5);
+                    // const dir = new THREE.Vector3().subVectors(pts.e, pts.d).normalize();
+                    // const perp = new THREE.Vector3(-dir.y, dir.x, 0);
+
+                    // pts.f = new THREE.Vector3().copy(mid).addScaledVector(perp, this.model.li.F.l);
+                    pts.f = this.fbl(pts.a, pts.e, pts.d, this.model.li.E.l, this.model.li.F.l, -1)
+                }
+
+                // --- g ---
+                {
+                    const ang = angleBetween(pts.d, pts.c) + ctes.betas[1];
+                    const dir = rotZ(ang);
+                    pts.g = new THREE.Vector3().copy(pts.d).addScaledVector(dir, this.model.li.I.l);
+                }
+
+                // --- i ---
+                {
+                    const ang = angleBetween(pts.d, pts.f);
+                    const dir = rotZ(ang);
+                    pts.i = new THREE.Vector3().copy(pts.d).addScaledVector(dir, this.model.li.J.l);
+                }
+
+                // --- h ---
+                {
+                    // const mid = new THREE.Vector3().addVectors(pts.g, pts.i).multiplyScalar(0.5);
+                    // const dir = new THREE.Vector3().subVectors(pts.i, pts.g).normalize();
+                    // const perp = new THREE.Vector3(-dir.y, dir.x, 0);
+
+                    // pts.h = new THREE.Vector3().copy(mid).addScaledVector(perp, this.model.li.K.l);
+                    pts.h = this.fbl(pts.d, pts.i, pts.g, this.model.li.J.l, this.model.li.I.l, -1)
+                }
+
+                // --- j ---
+                {
+                    const ang = angleBetween(pts.i, pts.h) + ctes.betas[2];
+                    const dir = rotZ(ang);
+                    pts.j = new THREE.Vector3().copy(pts.i).addScaledVector(dir, this.model.li.M.l);
+                }
+
+                return pts;
+            }
+
+            buildVisuals() {
+
+                Object.keys(this.joints).forEach(name => {
+
+                    const mesh = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03),
+                        new THREE.MeshBasicMaterial({ color: this.color_joins })
+                    )
+
+                    this.jointMeshes[name] = mesh
+                    this.root.add(mesh)
+
+                    const label = this.createLabel(name)
+                    label.position.set(0.05, 0.05, 0)
+
+                    mesh.add(label)
+
+
+                })
+
+                Object.values(this.model.li).forEach(link => {
+
+                    const geometry = new THREE.BoxGeometry(link.l, link.w, link.p)
+
+                    const mesh = new THREE.Mesh(
+                        geometry,
+                        //new THREE.MeshNormalMaterial()
+                        new THREE.MeshBasicMaterial({ color: this.color_links })
+                    )
+
+                    this.linkMeshes.push({ mesh, link })
+
+                    this.root.add(mesh)
+                })
+            }
+
+
+            update() {
+                this.joints = this.computePoints_deg(this.model, this.angles)
+
+                this.updateVisuals()
+            }
+
+
+            updateVisuals() {
+
+                Object.entries(this.joints).forEach(([name, pos]) => {
+                    this.jointMeshes[name].position.copy(pos)
+                })
+
+                this.linkMeshes.forEach(obj => {
+
+                    const A = this.joints[obj.link.nodes[0]]
+                    const B = this.joints[obj.link.nodes[1]]
+
+                    if (!A || !B) return
+
+                    const mesh = obj.mesh
+
+                    const mid = new THREE.Vector3().addVectors(A, B).multiplyScalar(0.5)
+                    mesh.position.copy(mid)
+
+                    const dir = new THREE.Vector3().subVectors(B, A).normalize()
+
+                    const quat = new THREE.Quaternion()
+                    quat.setFromUnitVectors(
+                        new THREE.Vector3(1, 0, 0),
+                        dir
+                    )
+
+                    mesh.setRotationFromQuaternion(quat)
+                })
+                this.root.rotation.y =
+                    THREE.MathUtils.degToRad(this.angles[0])
+            }
+
+            createLabel(text) {
+
+                const canvas = document.createElement("canvas")
+                const ctx = canvas.getContext("2d")
+
+                canvas.width = 256
+                canvas.height = 128
+
+                ctx.fillStyle = "black"
+                ctx.fillRect(0, 0, 256, 128)
+
+                ctx.fillStyle = "white"
+                ctx.font = "100px monospace"
+                ctx.textAlign = "center"
+                ctx.textBaseline = "middle"
+
+                ctx.fillText(text, 128, 64)
+
+                const texture = new THREE.CanvasTexture(canvas)
+
+                const material = new THREE.SpriteMaterial({ map: texture })
+
+                const sprite = new THREE.Sprite(material)
+
+                sprite.scale.set(0.15, 0.08, 1)
+
+                return sprite
+            }
+
+
+            fbl(A, D, B, L2, L3, elbow = 1) {
+
+                const AB = new THREE.Vector3().subVectors(B, A);
+                const BD = new THREE.Vector3().subVectors(D, B);
+
+                const d = BD.length();
+                const ex = BD.clone().normalize();
+
+                const a = (L2 * L2 - L3 * L3 + d * d) / (2 * d);
+
+                const h2 = L2 * L2 - a * a;
+                if (h2 < 0) return null;
+
+                const h = Math.sqrt(h2);
+
+                const P = B.clone().add(ex.clone().multiplyScalar(a));
+
+                const normal = new THREE.Vector3()
+                    .crossVectors(AB, BD)
+                    .normalize();
+
+                const ey = new THREE.Vector3()
+                    .crossVectors(normal, ex)
+                    .normalize();
+
+                return P.clone().add(ey.multiplyScalar(elbow * h));
+            }
+
+            inv_kin_2links_rad(P) {//Bug P.y<0, z03<0 y si alpha1<alpha2
+                const a1 = 0
+                const a2 = this.model.li.B.l
+                const a3 = this.model.li.J.l
+                const x03 = P.x;
+                const z03 = P.y;
+                const y03 = -P.z;
+                const th1 = Math.atan2(y03, x03);
+                console.log('th1', th1 * 180 / Math.PI)
+                const r1 = Math.sqrt(x03 ** 2 + y03 ** 2);
+                const r2 = -(z03 - a1);
+                const phi2 = Math.atan2(r2, r1);
+                const r3 = Math.sqrt(r1 ** 2 + r2 ** 2);
+                const phi1 = Math.acos((a3 ** 2 - a2 ** 2 - r3 ** 2) / (-2 * a2 * r3));
+                const th2 = phi1 - phi2;
+                const phi3 = Math.acos((r3 ** 2 - a2 ** 2 - a3 ** 2) / (-2 * a2 * a3));
+                const th3 = phi3 + th2 - Math.PI;
+                inv_kin_2link.innerText = "inv_kin_2link: "
+                    + th1 * 180 / Math.PI
+                    + ", " + th2 * 180 / Math.PI
+                    + ", " + th3 * 180 / Math.PI
+                return [th1, th2, th3];
+            }
+
+            inverseKinematics_deg(finalPoint = undefined) {
+                if (finalPoint == undefined) {
+                    finalPoint = new THREE.Vector3();
+                    //console.log('i',arm.jointMeshes.i)
+                    this.jointMeshes.i.getWorldPosition(finalPoint);
+                }
+                console.log('i', finalPoint)
+                // Step 1: analytic 2-link IK
+                const [alpha0, alpha1, alpha2] = this.inv_kin_2links_rad(finalPoint)
+
+                // Step 2: arm angle mapping
+                const gamma0 = alpha0
+                const gamma1 = alpha1
+                // Step 3: base joint
+                const a = new THREE.Vector3(0, 0, 0)
+
+                // Step 4: compute joint d
+                const d = new THREE.Vector3(this.model.li.B.l, 0, 0)
+                d.applyAxisAngle(new THREE.Vector3(0, 0, 1), alpha1)
+                d.add(a)
+
+                // Step 5: direction from d to target
+                //const dir = new THREE.Vector3().subVectors(finalPoint, d)
+                //const angle_df = Math.atan2(dir.y, dir.x)
+
+                // Step 6: compute joint f
+                const f = new THREE.Vector3(this.model.li.E.l, 0, 0)
+                f.applyAxisAngle(new THREE.Vector3(0, 0, 1), alpha2 + Math.PI)
+                f.add(d)
+
+                // Step 7: four-bar linkage
+                const e = this.fbl(d, a, f, this.model.li.F.l, this.model.li.G.l, -1)
+
+                // Step 8: servo angle
+                const gamma2 = Math.atan2(e.y - a.y, e.x - a.x)
+                //console.log("dir", d,dir)
+                // debug_div.innerText =
+                //     //"finalPoint:"+finalPoint.x+
+                //     "model.li.B: " + this.model.li.B.l +
+                //     " a: " + a.x + ", " + a.y + ", " + a.z +
+                //     " d: " + d.x + ", " + d.y + ", " + d.z +
+                //     //" dir: " + dir +
+                //     //" angle_df: " + angle_df*180/Math.PI +
+                //     " f: " + f.x + ", " + f.y + ", " + f.z +
+                //     " e: " + e.x + ", " + e.y + ", " + e.z +
+                //     " gamma2: " + gamma2
+                return [gamma0 * 180 / Math.PI, gamma1 * 180 / Math.PI, gamma2 * 180 / Math.PI]
+            }
+
+        }
+
+
+        class RobotController {
+            constructor(robot) {//, kinematics
+                this.robot = robot;
+                //this.kinematics = kinematics;
+                logDebug('To update the model, use the command "update_model"')
+                logDebug('To start a sequence, use the command "seq" and the name. e.g., "seq diamond"')
+                this.state={"action":"wait"}
+            }
+
+            setManualAngles(angles) {
+                this.robot.setAngles_deg(angles);
+            }
+
+            update() {
+                if (this.state.action=="seq"){
+                    console.log('upfate seq',Date.now(),this.state)
+                    const point=this.state.seq.getPointAtTime(Date.now())
+                    console.log('update point', point)
+                    if ( point==undefined){
+                        this.state.action="wait"
+                        delete this.state.seq
+                    }
+                    else{
+                        const angles = this.robot.inverseKinematics_deg(point);
+                        console.log('update seqgo', point, angles)
+                        if (angles) {
+                            this.robot.setAngles_deg(angles);
+                        }
+
+                    }
+                }
+                // move along bezier curve
+
+            }
+
+            executeCommand(cmd) {
+                const parts = cmd.split(" ");
+
+                const command = parts[0];
+
+                switch (command) {
+
+                    case "update_model": App
+                        this.robot.update_model()
+                        break
+
+                    case "angles":
+                        // angles 30 10 0
+                        this.robot.setAngles_deg([
+                            parseFloat(parts[1]),
+                            parseFloat(parts[2]),
+                            parseFloat(parts[3])
+                        ]);
+                        break;
+
+                    case "go":
+                        // go x y z
+                        const target = new THREE.Vector3(
+                            parseFloat(parts[1]),
+                            parseFloat(parts[2]),
+                            parseFloat(parts[3])
+                        );
+
+                        const angles = this.robot.inverseKinematics_deg(target);
+                        console.log('go', target, angles)
+                        if (angles) {
+                            this.robot.setAngles_deg(angles);
+                        }
+
+
+                        break;
+
+                    case "seq":
+                        // use JSON textarea
+                        const seq = new  Sequence(this.robot.model.sequences[parts[1]],Date.now());
+                        console.log('revisar',seq)
+                        this.state.action = "seq"
+                        this.state.seq=seq//new Sequence(data,Date.now())
+                        // if (data) {
+                        //     this.state.action = "bezier4"
+                        //     this.bezier4=new Bezier4(data, Date.now())
+                        // }
+                        // else{
+                        //     logDebug("Unknown sequence: " + parts[1]);
+                        // }
+                        // break;
+
+                    default:
+                        logDebug("Unknown command: " + command);
+                }
+            }
+        }
+//seq diamond
+        class Sequence{
+            constructor(data,ts){
+                console.log('seqseq',data)
+                //this.data=[...data].reverse()
+                this.data=data
+                this.ts=ts
+                //this.actual=this.data.shift()
+                //console.log('Sequence',this.actual)
+                this.read_data()
+            }
+
+            read_data(){
+                this.actual=this.data.shift()
+                if ("bezier4" in this.actual){
+                    this.actual_obj=new Bezier4(this.actual,this.ts)
+                } 
+                else
+                {
+                    logDebug("Unknown command: " + this.actual);
+                    console.log('seq '+"Unknown command: " + this.actual)
+                }
+
+            }
+
+
+            // getPoint(t) {
+            //     if (t<0 || t>1){
+            //         return undefined
+            //     }
+            //     this.actual_obj.getPoint(t)
+            // }
+
+            getPointAtTime(ts) {
+                return this.actual_obj.getPointAtTime(ts)
+                // let t = (time_s-this.time_ini) / this.actual.duration;
+                // //t = Math.min(Math.max(t, 0), 1);
+                // return this.getPoint(t);
+            }
+  
+
+        }
+
+        class Bezier4 {
+            constructor(data,time_ini) {
+                console.log('Bezier4',data)
+                this.P0 = new THREE.Vector3(...data.bezier4.P0_dm);
+                this.P1 = new THREE.Vector3(...data.bezier4.P1_dm);
+                this.P2 = new THREE.Vector3(...data.bezier4.P2_dm);
+                this.P3 = new THREE.Vector3(...data.bezier4.P3_dm);
+                this.duration_s = data.duration_s;
+                this.time_ini = time_ini;
+            }
+
+            getPoint(t) {
+                console.log('Bezier4 t',t,this.P0,this.P1,this.P2,this.P3)
+                if (t<0 || t>1){
+                    return undefined
+                }
+                const u = 1 - t;
+                const vec= new THREE.Vector3()
+                    .addScaledVector(this.P0, u * u * u)
+                    .addScaledVector(this.P1, 3 * u * u * t)
+                    .addScaledVector(this.P2, 3 * u * t * t)
+                    .addScaledVector(this.P3, t * t * t);
+                console.log('Bezier4 vec',vec,u,t)
+                return vec
+            }
+
+            getPointAtTime(time_s) {
+                console.log('Bezier4b t',time_s,this.time_ini,this.duration_s)
+                let t = (time_s-this.time_ini) / this.duration_s/1000;
+                //t = Math.min(Math.max(t, 0), 1);
+                return this.getPoint(t);
+            }
+        }
+
+        class UIController {
+            constructor(controller, robot, app) {
+                this.controller = controller;
+                this.robot = robot
+                const s0 = document.getElementById("slider0");
+                const s1 = document.getElementById("slider1");
+                const s2 = document.getElementById("slider2");
+
+                s0.oninput = () => {
+                    this.controller.setManualAngles([parseFloat(s0.value), undefined, undefined]);
+                    document.getElementById("lab_slider0").innerText = s0.value
+                    app.update()
+                };
+
+                s1.oninput = () => {
+                    this.controller.setManualAngles([undefined, parseFloat(s1.value), undefined]);
+                    document.getElementById("lab_slider1").innerText = s1.value
+                    app.update()
+                };
+
+                s2.oninput = () => {
+                    this.controller.setManualAngles([undefined, undefined, parseFloat(s2.value)]);
+                    document.getElementById("lab_slider2").innerText = s2.value
+                    app.update()
+                };
+
+                this.textarea = document.getElementById("modelInput")
+                this.textarea.value = JSON.stringify(robot.model, null, 2)
+
+
+            }
+
+
+
+        }
+
+        class App {
+            constructor() {
+                this.viewer = new Viewer();
+                this.robot = new MeArm(this.viewer.scene);
+                this.robot2 = new MeArm(this.viewer.scene);
+                this.robot2.root.position.set(0, 1.2, 0);
+                this.controller = new RobotController(this.robot);
+                this.ui = new UIController(this.controller, this.robot, this);
+                logDebug("Listo");
+            }
+
+            animate = (time) => {
+                this.controller.update();
+                this.viewer.render();
+                requestAnimationFrame(this.animate);
+            }
+
+            update() {
+                console.log('App.update', this.robot)
+                this.robot2.setAngles_deg(this.robot.inverseKinematics_deg())
+            }
+        }
+
+        // ✅ START APP (must be at the end)
+        const app = new App();
+        requestAnimationFrame(app.animate);
+
+        // Helpers
+
+        function logDebug(text) {
+            const debug = document.getElementById("debug");
+            debug.innerText = text + "\n" + debug.innerText;
+        }
+
+
+
+
+    </script>
+
+</body>
+
+</html>
