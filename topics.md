@@ -52,7 +52,7 @@ Manage the sequences
   "states": [
       { "v_dm/s": 10, "w_deg/s": 0, "alfa0_deg": 0, "alfa1_deg": 0, "alfa2_deg": 0, "duration_s": 1.0 },
       { "v_dm/s": 15.7, "w_deg/s": 90, "alfa0_deg": 0, "alfa1_deg": 0, "alfa2_deg": 0, "duration_s": 1.0 },
-      { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": -90, "alfa1_deg": 0, "alfa2_deg": 0, "duration_S": 1.0 },
+      { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": -90, "alfa1_deg": 0, "alfa2_deg": 0, "duration_s": 1.0 },
       { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": 90, "alfa1_deg": 0, "alfa2_deg": 0, "duration_s": 2.0 },
       { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": 0, "alfa1_deg": 90, "alfa2_deg": 0, "duration_s": 1.0 },
       { "v_dm/s": 0, "w_deg/s": 0, "alfa0_deg": 0, "alfa1_deg": 0, "alfa2_deg": 90, "duration_s": 1.0 }
@@ -85,11 +85,30 @@ Manage the sequences
   "time": "2025-09-25T20:00:00Z"
 }
 ```
-## 3. Bezier curve
-
+## 3. Bezier curve example
 ### Topic base:
 
-`UDFJC/emb1/robot0/RPi/bezier`
+`UDFJC/emb1/robot0/RPi/sequence`
 
-
-To be defined
+```json
+// Create a sequence
+{
+  "action": "create",
+  "name": "pasos",
+  "time": "2025-09-25T20:00:00Z",
+  "states": [
+      { "car_bezier2": { "P0_dm": [ 0.35, 0.35], "P1_dm": [ 0.7, 0] }, 
+        "arm_bezier4": { "P0_dm": [0.5, 0, 0], "P1_dm": [0.5, 0.3, 0.3], "P2_dm": [0.5, 0.3, -0.3],"P3_dm": [0.5, 0, 0]}, 
+        "duration_s": 1.0 },
+      { "v_dm/s": 15.7, "w_deg/s": 90,  
+         "arm_bezier2": { "P0_dm": [0.5, 0.35, 0.35], "P1_dm": [0.5, 0.7, 0]  }, 
+         "duration_s": 1.0 },
+      { "car_bezier2": { "P0_dm": [0.5, 0.7, 0],  "P1_dm": [0.5, 0.35, -0.35] },
+        "alfa0_deg": 0, "alfa1_deg": 0, "alfa2_deg": 90, 
+        "duration_s": 1.0 },
+      { "v_dm/s": 0, "w_deg/s": 0, 
+        "alfa0_deg": 90, "alfa1_deg": 0, "alfa2_deg": 0, 
+        "duration_s": 2.0 }
+   ]
+}
+```
