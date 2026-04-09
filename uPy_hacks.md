@@ -1,6 +1,6 @@
 
 
-# MicroPython Haks
+# MicroPython Hacks
 
 ## Types of Data
 
