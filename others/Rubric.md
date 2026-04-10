@@ -2,14 +2,11 @@
 
 ## Final Grade Distribution
 
-| Category                             | Weight |
-| ------------------------------------ | ------ |
-|  RPi Pico Coding (OOP + PubSub)    | 49%    |
-|  Frontend + Functional Performance | 51%    |
+
 
 ---
 
-# 1. RPi Pico Coding (49%)
+# 1. RPi Pico Coding (30%)
 
 Each subsystem is evaluated using the same criteria:
 
@@ -21,21 +18,22 @@ Each subsystem is evaluated using the same criteria:
 
 ## 📊 Evaluation Matrix
 
-| Block ↓ / Criteria → | Encapsulation (2) | PubSub (2) | Quality (1) | Docs (1) | Testing (1) | Total |
+| Block ↓ / Criteria → | Encapsulation (10%) | PubSub (10%) | Quality (4%) | Docs (3%) | Testing (3%) | Total |
 | -------------------- | ----------------- | ---------- | ----------- | -------- | ----------- | ----- |
-|  Car               |                   |            |             |          |             | /7    |
-|  Arm               |                   |            |             |          |             | /7    |
-|  Display battery level          |                   |            |             |          |             | /7    |
-|  Distance          |                   |            |             |          |             | /7    |
-|  Communication     |                   |            |             |          |             | /7    |
-|  Scheduling        |                   |            |             |          |             | /7    |
-|  PubSub Core       |                   |            |             |          |             | /7    |
+|  Car               |                   |            |             |          |             |    |
+|  Arm               |                   |            |             |          |             |    |
+|  Display battery level          |                   |            |             |          |             |    |
+|  Camera          |                   |            |             |          |             |    |
+|  Distance          |                   |            |             |          |             |   |
+|  Communication     |                   |            |             |          |             |    |
+|  Scheduling        |                   |            |             |          |             |    |
+|  PubSub Core       |                   |            |             |          |             |     |
 
- Total: **49%**
+
 
 ---
 
-# 2. Frontend (36%)
+# 2. Frontend (30%)
 
 The interface must use a **class-based structure + PubSub architecture** and reflect the robot state.
 
@@ -43,24 +41,24 @@ The interface must use a **class-based structure + PubSub architecture** and ref
 
 | Component       | Weight | Description                      |
 | --------------- | ------ | -------------------------------- |
-|  Camera View  | 6%     | Displays camera stream correctly |
-|  Virtual Arm  | 6%     | Reflects real arm movement       |
-|  Virtual Car  | 6%     | Reflects robot position          |
-|  Controls     | 6%     | Sends commands via topics        |
-|  Robot Info   | 6%     | Displays sensor data             |
-|  Log Messages | 6%     | Shows system messages via PubSub |
+|  Camera View  | 5%     | Displays camera and RoI  |
+|  Virtual Arm  | 5%     | Reflects real arm movement       |
+|  Virtual Car  | 5%     | Reflects robot position          |
+|  Controls     | 5%     | Sends commands via topics        |
+|  Robot Info   | 5%     | Displays sensor data             |
+|  Log Messages | 5%     | Shows system messages via PubSub |
 
 ---
 
-#  3. Functional Performance (15%)
+#  3. Functional Performance (40%)
 
 ##📊 Tasks
 
 | Task               | Weight | Description                     |
 | ------------------ | ------ | ------------------------------- |
-|  Go to Cardboard | 5%     | Robot approaches using camera   |
-|  Hold Cardboard  | 5%     | Robot successfully grips object |
-|  Move Cardboard  | 5%     | Robot moves object to target    |
+|  Go to Cardboard | 10%     | Robot approaches using camera   |
+|  Hold Cardboard  | 10%     | Robot successfully grips object |
+|  Move Cardboard  | 20%     | Robot moves object to target    |
 
 ---
 
