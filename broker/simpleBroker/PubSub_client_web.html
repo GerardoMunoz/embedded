@@ -100,6 +100,10 @@
       <p id="status">Desconectado</p>
     </section>
  <script>
+
+const params = new URLSearchParams(window.location.search);
+const robotId = params.get("robot") || "0"; // default = 0
+
   /* ============================================================
      CLIENTE WEBSOCKET
   ============================================================ */
@@ -309,6 +313,7 @@ refreshSubscriptionsPanel();
 // Inputs del panel de mensajes
 const basePrefixInput = document.getElementById("basePrefix");
 const robotIdInput    = document.getElementById("robotId");
+robotIdInput.value=robotId
 const fullPrefixInput = document.getElementById("fullPrefix");
 
 // Calcula bus.prefix = basePrefix + "/robot" + robotId
@@ -316,7 +321,7 @@ function updatePrefixFromParts() {
     let base = (basePrefixInput.value || "").trim();
     if (base.endsWith("/")) base = base.slice(0, -1);
 
-    let robotId = (robotIdInput.value || "").trim();
+//    let robotId = (robotIdInput.value || "").trim();
     if (robotId === "") robotId = "0";
 
     fullPrefixInput.value = base + "/robot" + robotId;
