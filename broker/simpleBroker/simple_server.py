@@ -100,7 +100,7 @@ class PubSub:
 
     def subscribe(self, client, topic):
         self.subscriptions.setdefault(topic, set()).add(client)
-        print(f"[SUB] {client} -> {topic}")
+        print(f"[SUB] {client} -> {topic}",self.subscriptions.keys())
 
     async def publish(self, topic, data, origin=None):
         msg = json.dumps({
