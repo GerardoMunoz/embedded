@@ -17,13 +17,13 @@ In this final project, you will design and implement an **autonomous robotic sys
 
 The final grade will be distributed as follows:
 
-1. **20% – Challenge: Autonomous Cardboard Handling**
-2. **10% – Presentation**
+1. **25% – Challenge: Autonomous Cardboard Handling**
+2. **5% – Presentation**
 3. **5% – GitHub Repository**
 
 ---
 
-## 1. Challenge: Autonomous Cardboard Handling
+##  1. Challenge: Autonomous Cardboard Handling
 
 Your robot must autonomously complete the following tasks:
 
@@ -31,6 +31,35 @@ Your robot must autonomously complete the following tasks:
 * **5%** Place the fork underneath the tray
 * **5%** Lift the tray
 * **5%** Place the tray inside a rectangular area located 10 cm to the right of the original position
+* **5%** **Completion Time Performance**
+
+---
+
+###  Completion Time Performance (5%)
+
+The final 5% will be assigned based on how fast each robot completes the full task autonomously.
+
+* The **first team** to successfully complete the challenge receives **5.0**
+* Each subsequent position will receive **0.2 less** than the previous one
+
+#### Example:
+
+* 1st place → 5.0
+* 2nd place → 4.8
+* 3rd place → 4.6
+* 4th place → 4.4
+* …
+
+---
+
+### ⚠️ Important Rules
+
+* The task must be completed **fully autonomously** (no manual intervention)
+* Only **successful completions** are ranked
+* If a robot fails the task, it does not receive time-based points
+* In case of a tie, teams will receive the same score
+
+---
 
 ---
 
@@ -69,19 +98,6 @@ Each student must record a **video of their assigned topic**:
 * The video must be uploaded to a **cloud platform** (e.g., Google Drive)
 * Submit the **video link** using the provided form
 
-📅 **Deadline:** June 3
-You must submit:
-
-* Video link
-* GitHub repository link
-
----
-
-### Robot Challenge Evaluation
-
-The evaluation of the robot challenge will take place on:
-
-📅 **June 5**
 
 ---
 # List of Topics
@@ -182,7 +198,7 @@ The evaluation of the robot challenge will take place on:
 
 ---
 
-## 📢 Topic Selection
+##  Topic Selection
 
 Please write in the WhatsApp chat the number (**1 to 20**) of the topic you choose.
 
@@ -192,21 +208,11 @@ Each student must present a **different topic**.
 
 
 
----
 
-## 🎤 3. Final Presentation (in English)
-
-There will be **one global presentation for the entire class**.
-
-### Presentation Format:
-
-* The system must be presented as a **single integrated project**
-* Each student is responsible for explaining a specific part
-  *(Please select one topic from the list and write your choice in the class WhatsApp chat)*
 
 ---
 
-### 🎥 Video Submission
+###  Video Submission
 
 Each student must record a **video of their assigned topic**:
 
@@ -222,7 +228,7 @@ You must submit:
 
 ---
 
-### 🤖 Robot Challenge Evaluation
+###  Robot Challenge Evaluation
 
 The evaluation of the robot challenge will take place on:
 
