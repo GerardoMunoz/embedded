@@ -29,3 +29,4 @@ Do not forget to copy in the same directory of your .c file pico_sdk_import.cmak
 * https://colab.research.google.com/github/GerardoMunoz/embedded/blob/main/MultiTask.ipynb
 * https://colab.research.google.com/github/GerardoMunoz/embedded/blob/main/MultipleSockets.ipynb
 * https://github.com/GerardoMunoz/embedded/blob/main/broker/PubSub_aruco_corners_python.py
+* https://gerardomunoz.github.io/embedded/others/car_search.html
