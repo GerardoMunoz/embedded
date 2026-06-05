@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Car Vision Policy</title>
+  <style>
+    body { margin: 0; background: #111; color: white; }
+    #container { display: flex; }
+    canvas { background: #222; margin: 10px; }
+
+  </style>
+</head>
+<body>
+
+<div id="container">
+  <canvas id="world" width="600" height="600"></canvas>
+  <canvas id="camera" width="300" height="300"></canvas>
+  
+</div>
+<div id="texto">Texto original</div>
+<script>
+const world = document.getElementById("world");
+const wctx = world.getContext("2d");
+
+const camCanvas = document.getElementById("camera");
+const cctx = camCanvas.getContext("2d");
+
+// Flags
+const flags = [
+  {x:275,y:350,color:"blue"},
+  {x:325,y:350,color:"green"},
+  {x:300,y:300,color:"red"}
+];
+
+// ===== CAR INITIAL POSITION (inside circle) =====
+function randomInCircle(cx, cy, r){
+  let a = Math.random()*Math.PI*2;
+  let d = r//Math.sqrt(Math.random())*r;
+  return {x: cx + Math.cos(a)*d, y: cy + Math.sin(a)*d};
+}
+
+let start = randomInCircle(300,300,200);
+
+let car = {
+  x: start.x,
+  y: start.y,
+  angle: Math.random()*Math.PI*2,
+  speed: 1.2,
+  mode: "rotate" // rotate | move
+};
+
+// Camera
+const FOV = Math.PI/2;
+const MAX_DIST = 400;
+
+// ===== VISION =====
+function normalize(a){
+  while(a > Math.PI) a -= 2*Math.PI;
+  while(a < -Math.PI) a += 2*Math.PI;
+  return a;
+}
+
+function getVisibleFlags(){
+  let visibles = [];
+
+  flags.forEach(f=>{
+    let dx = f.x - car.x;
+    let dy = f.y - car.y;
+    let dist = Math.hypot(dx,dy);
+    if(dist > MAX_DIST) return;
+
+    let angle = Math.atan2(dy,dx);
+    let rel = normalize(angle - car.angle);
+
+    if(Math.abs(rel) < FOV/2){
+      visibles.push({
+        ...f,
+        relAngle: rel,
+        screenX: (rel/(FOV/2))*(camCanvas.width/2)+camCanvas.width/2
+      });
+    }
+  });
+
+  return visibles.sort((a,b)=>a.screenX - b.screenX);
+}
+
+// ===== POLICY =====
+let estimatedPos = null;
+
+function control(){
+  let v = getVisibleFlags();
+
+  // Rotate until all 3 visible
+  if(v.length < 3){
+    car.angle += 0.02;
+    return;
+  }
+
+
+  let left = v[0];
+  let center = v[1];
+  let right = v[2];
+
+  let dl = Math.abs(center.screenX - left.screenX);
+  let dr = Math.abs(right.screenX - center.screenX);
+
+  // ===== STEP 1: DETERMINE ZONE =====
+  let order = left.color + "-" + center.color + "-" + right.color;
+ 
+  
+  let zoneMap = {
+    "green-blue-red": 0,
+    "green-red-blue": 1,
+    "red-green-blue": 2,
+    "red-blue-green": 3,
+    "blue-red-green": 4,
+    "blue-green-red": 5
+  };
+
+  let zone = zoneMap[order];
+
+  if(zone === undefined) return;
+
+  // ===== STEP 2: COMPUTE ANGLE =====
+  let ratio = dl / (dl + dr); // [0,1]
+
+  let angleDeg = (zone + ratio) * 60;
+  let angleRad = angleDeg * Math.PI / 180;
+  // ===== ESTIMATED POSITION ON CIRCLE =====
+  let cx = 300, cy = 300, r = 200;
+
+  estimatedPos = {
+    x: cx + Math.cos(angleRad) * r,
+    y: cy - Math.sin(angleRad) * r
+  };
+ document.getElementById("texto").textContent =order+' '+zone+' '+ratio+' '+angleDeg+' '+Math.cos(angleRad)+' '+Math.sin(angleRad)+' '+angleRad;
+  return;////////////////////////////////////////
+  // ===== TARGET (TOP or BOTTOM) =====
+  let target;
+
+  if(estimatedPos.y < cy){
+    // already upper half → go to top
+    target = {x:300, y:100};
+  } else {
+    target = {x:300, y:500};
+  }
+
+  // ===== MOVE TOWARD TARGET =====
+  let dx = target.x - car.x;
+  let dy = target.y - car.y;
+
+  let desiredAngle = Math.atan2(dy, dx);
+
+  let diff = normalize(desiredAngle - car.angle);
+
+  // rotate toward target
+  if(Math.abs(diff) > 0.05){
+    car.angle += diff * 0.1;
+  } else {
+    car.x += Math.cos(car.angle) * car.speed;
+    car.y += Math.sin(car.angle) * car.speed;
+  }
+}
+
+// ===== DRAW WORLD =====
+function drawWorld(){
+  wctx.clearRect(0,0,600,600);
+
+  // Circle start zone
+  wctx.strokeStyle="gray";
+  wctx.beginPath();
+  wctx.arc(300,300,200,0,Math.PI*2);
+  wctx.stroke();
+
+  // Triangle
+  wctx.strokeStyle="white";
+  wctx.beginPath();
+  wctx.moveTo(flags[0].x,flags[0].y);
+  wctx.lineTo(flags[1].x,flags[1].y);
+  wctx.lineTo(flags[2].x,flags[2].y);
+  wctx.closePath();
+  wctx.stroke();
+
+  // Flags
+  flags.forEach(f=>{
+    wctx.fillStyle=f.color;
+    wctx.beginPath();
+    wctx.arc(f.x,f.y,10,0,Math.PI*2);
+    wctx.fill();
+  });
+
+  // Car
+  wctx.fillStyle="yellow";
+  wctx.beginPath();
+  wctx.arc(car.x,car.y,8,0,Math.PI*2);
+  wctx.fill();
+
+  // Direction
+  wctx.strokeStyle="yellow";
+  wctx.beginPath();
+  wctx.moveTo(car.x,car.y);
+  wctx.lineTo(
+    car.x + Math.cos(car.angle)*30,
+    car.y + Math.sin(car.angle)*30
+  );
+  wctx.stroke();
+
+  if(estimatedPos){
+  wctx.fillStyle = "white";
+  wctx.beginPath();
+  wctx.arc(estimatedPos.x, estimatedPos.y, 6, 0, Math.PI*2);
+  wctx.fill();
+}
+}
+
+// ===== DRAW CAMERA =====
+function drawCamera(){
+  cctx.clearRect(0,0,300,300);
+
+  let v = getVisibleFlags();
+
+  v.forEach(f=>{
+    cctx.fillStyle=f.color;
+    cctx.beginPath();
+    cctx.arc(f.screenX,150,10,0,Math.PI*2);
+    cctx.fill();
+  });
+
+  // center line
+  cctx.strokeStyle="white";
+  cctx.beginPath();
+  cctx.moveTo(150,0);
+  cctx.lineTo(150,300);
+  cctx.stroke();
+}
+
+// ===== LOOP =====
+function loop(){
+  control();
+  drawWorld();
+  drawCamera();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
