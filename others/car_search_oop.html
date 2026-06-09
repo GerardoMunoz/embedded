@@ -222,7 +222,7 @@
                 if (!this.startTime) this.startTime = now;
 
                 let dt = now - this.startTime;
-                console.log('dt',dt)
+                //console.log('dt',dt)
 
                 document.getElementById("state").textContent = this.state + ' ' + v.length;
                 // ===== 1. SEARCH: rotate until see 3 colors =====
@@ -277,6 +277,7 @@
                     if (zone == 1 || zone == 4) {
                         console.log('zone1 OR zone4', this.targetDistance, this.car_virtual.x, this.car_virtual.y);
                         this.state = "APPROACH_RED";
+                        this.targetDistanceRed = 100
                         // this.prevRedSize = 0;
                         // this.stableCount = 0;
                         this.startTime = now
@@ -287,8 +288,9 @@
                         this.startTime = null;
 
                         this.targetAngle1 = Math.PI / 4 + angleRad / 2; // example
-                        this.targetDistance = 2 * r * Math.sin(angleRad / 2 - Math.PI / 4);
+                        this.targetDistance = 2 * r * Math.sin(Math.PI / 4-angleRad / 2 ) ;
                         this.targetAngle2 = 5 * Math.PI / 4 + angleRad / 2; // example
+                        this.targetDistanceRed = 100
                         console.log('zone', zone, this.targetDistance, this.car_virtual.x, this.car_virtual.y);//angleRad/Math.PI*180,this.targetAngle1,this.targetAngle1/Math.PI*180)
 
                         this.angularSpeed = .5; // rad/s
@@ -304,7 +306,8 @@
 
                         this.targetAngle1 = 5 * Math.PI / 4 + angleRad / 2; // example
                         this.targetDistance = 2 * r * Math.sin(angleRad / 2 - Math.PI / 4);
-                        this.targetAngle2 = 5 * Math.PI / 4 + angleRad / 2; // example
+                        this.targetAngle2 =  Math.PI / 4 + angleRad / 2; // example
+                        this.targetDistanceRed = 100
                         console.log('zone', zone, angleRad, this.targetDistance, this.car_virtual.x, this.car_virtual.y);//angleRad/Math.PI*180,this.targetAngle1,this.targetAngle1/Math.PI*180)
 
                         this.angularSpeed = .5; // rad/s
@@ -321,6 +324,7 @@
                         this.targetAngle1 = angleRad / 2 - Math.PI / 4; // example
                         this.targetDistance = 2 * r * Math.sin(3 * Math.PI / 4 - angleRad / 2);
                         this.targetAngle2 = 3 * Math.PI / 4 + angleRad / 2; // example
+                        this.targetDistanceRed = 100
                         console.log('zone', zone, angleRad, this.targetDistance, this.targetAngle1, this.car_virtual.x, this.car_virtual.y);//angleRad/Math.PI*180,this.targetAngle1,this.targetAngle1/Math.PI*180)
 
                         this.angularSpeed = .5; // rad/s
@@ -336,7 +340,8 @@
 
                         this.targetAngle1 = 3 * Math.PI / 4 + angleRad / 2; // example
                         this.targetDistance = 2 * r * Math.sin(angleRad / 2 - 3 * Math.PI / 4);
-                        this.targetAngle2 = angleRad / 2 - 3 * Math.PI / 4//5*Math.PI/4+; // example
+                        this.targetAngle2 = angleRad / 2 -  Math.PI / 4;//5*Math.PI/4+; // example
+                        this.targetDistanceRed = 100
                         console.log('zone', zone, this.targetDistance, this.car_virtual.x, this.car_virtual.y, this.targetAngle2);//angleRad/Math.PI*180,this.targetAngle1,this.targetAngle1/Math.PI*180)
 
                         this.angularSpeed = .5; // rad/s
@@ -384,7 +389,7 @@
                 if (this.state === "ROTATE2") {
 
                     let rotated2 = dt * this.angularSpeed;
-                    //console.log('ROTATE2',rotated2 , this.targetAngle2, dt , this.angularSpeed,now , this.startTime)
+                    console.log('ROTATE2',rotated2 , this.targetAngle2, dt , this.angularSpeed,now , this.startTime)
 
                     if (rotated2 < this.targetAngle2) {
                         this.bus.publish("car/twist", { angular: this.angularSpeed, linear: 0 });
@@ -422,7 +427,7 @@
 
 
                     let moved = dt * this.linearSpeed;
-                    this.targetDistanceRed = 150
+                    
                     document.getElementById("debug").textContent = this.targetDistanceRed + ' ' + moved + ' ' + dt + ' ' + this.linearSpeed + ' ' + this.car_virtual.x + ' ' + this.car_virtual.y
                     if (moved < this.targetDistanceRed) {
                         this.bus.publish("car/twist", { angular: 0, linear: this.linearSpeed });
@@ -612,7 +617,7 @@
 
         // ================= INIT =================
         //let start = randomInCircle(300, 300, 200);
-        a = -7 * Math.PI / 6
+        a = -9 * Math.PI / 6
         let start = { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, angle: Math.random() * Math.PI * 2 }
         const car_real = new Car(bus, start);
         //const car_virtual = new Car(bus,{x:100,y:100});
