@@ -87,6 +87,10 @@ def suma_native(a, b):
 def toggle(pin: int):
     import machine
     machine.mem32[0xD0000014] = 1 << pin
+
+@micropython.asm_thumb
+def add(a, b):
+    add(r0, r0, r1)
 ```
 
 Viper lets you type variables and use C-style memory addresses.
